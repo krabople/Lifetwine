@@ -7,7 +7,7 @@
 	<key>provisioningProfiles</key>
 	<dict>
 		<key>com.krabople.lifetwine</key>
-		<string>AppStore com.krabople.lifetwine</string>
+		<string>AppStore Lifetwine GitHub</string>
 	</dict>
 	<key>signingStyle</key>
 	<string>manual</string>
