@@ -42,18 +42,21 @@ struct EntrySnapshot: Hashable, Sendable {
     let metricID: UUID
     let timestamp: Date
     let numericValue: Double?
+    let textValue: String
 
     init?(_ entry: MetricEntry) {
         guard let metricID = entry.metric?.id else { return nil }
         self.metricID = metricID
         timestamp = entry.timestamp
         numericValue = entry.numericValue
+        textValue = entry.textValue
     }
 
-    init(metricID: UUID, timestamp: Date, numericValue: Double?) {
+    init(metricID: UUID, timestamp: Date, numericValue: Double?, textValue: String = "") {
         self.metricID = metricID
         self.timestamp = timestamp
         self.numericValue = numericValue
+        self.textValue = textValue
     }
 }
 
@@ -100,7 +103,7 @@ struct InsightFinding: Identifiable, Hashable, Sendable {
     var headline: String {
         let outcomeDirection = isPositive ? "higher" : "lower"
         switch sourceKind {
-        case .yesNo:
+        case .yesNo, .event:
             return "When you logged \(sourceName.lowercased()), \(outcomeName.lowercased()) tended to be \(outcomeDirection) \(lagPhrase)."
         case .time:
             return "Later \(sourceName.lowercased()) tended to come with \(outcomeDirection) \(outcomeName.lowercased()) \(lagPhrase)."
@@ -142,12 +145,17 @@ enum CorrelationEngine {
         entries: [EntrySnapshot],
         calendar: Calendar = .current
     ) -> InsightReport {
-        let eligibleMetrics = metrics.filter { $0.kind != .note || $0.aggregation == .count }
+        // Free text is context, not a defensible numeric signal. Structured events and
+        // selections remain eligible; notes are intentionally excluded.
+        let eligibleMetrics = metrics.filter { $0.kind != .note }
         let metricMap = Dictionary(uniqueKeysWithValues: eligibleMetrics.map { ($0.id, $0) })
-        let usableEntries = entries.filter { metricMap[$0.metricID] != nil && $0.numericValue != nil }
+        let usableEntries = entries.filter {
+            guard let metric = metricMap[$0.metricID] else { return false }
+            return $0.numericValue != nil || (metric.kind == .multiChoice && !$0.textValue.isEmpty)
+        }
         let loggedDays = Set(usableEntries.map { calendar.startOfDay(for: $0.timestamp) }).count
         let dailyValues = makeDailyValues(metrics: metricMap, entries: usableEntries, calendar: calendar)
-        let series = makeSeries(metrics: eligibleMetrics, dailyValues: dailyValues)
+        let series = makeSeries(metrics: eligibleMetrics, dailyValues: dailyValues, entries: usableEntries, calendar: calendar)
         let sources = series.filter { $0.role != .outcome }
         let outcomes = series.filter { $0.role != .influence && $0.kind != .choice }
         let bestMatchedDays = sources.flatMap { source in
@@ -266,12 +274,59 @@ enum CorrelationEngine {
 
     private static func makeSeries(
         metrics: [MetricSnapshot],
-        dailyValues: [UUID: [Date: Double]]
+        dailyValues: [UUID: [Date: Double]],
+        entries: [EntrySnapshot],
+        calendar: Calendar
     ) -> [Series] {
         var result: [Series] = []
         for metric in metrics {
+            if metric.kind == .multiChoice, !metric.choices.isEmpty {
+                let days = Dictionary(grouping: entries.filter { $0.metricID == metric.id }) {
+                    calendar.startOfDay(for: $0.timestamp)
+                }
+                for (index, choice) in metric.choices.enumerated() {
+                    let values = days.mapValues { dayEntries in
+                        dayEntries.contains { selectedChoices(in: $0.textValue).contains(choice) } ? 1.0 : 0.0
+                    }
+                    guard !values.isEmpty else { continue }
+                    result.append(Series(
+                        identity: "\(metric.id.uuidString):multi:\(index)",
+                        metricID: metric.id,
+                        name: "\(metric.name): \(choice)",
+                        kind: .yesNo,
+                        role: metric.role,
+                        values: values
+                    ))
+                }
+                continue
+            }
+
+            if metric.kind == .medication {
+                let relevantEntries = entries.filter { $0.metricID == metric.id && !$0.textValue.isEmpty }
+                let days = Dictionary(grouping: relevantEntries) { calendar.startOfDay(for: $0.timestamp) }
+                let medicationNames = Set(relevantEntries.map(\.textValue)).sorted()
+                for (index, medicationName) in medicationNames.enumerated() {
+                    let values = days.mapValues { dayEntries in
+                        dayEntries
+                            .filter { $0.textValue == medicationName }
+                            .compactMap(\.numericValue)
+                            .reduce(0, +)
+                    }
+                    guard !values.isEmpty else { continue }
+                    result.append(Series(
+                        identity: "\(metric.id.uuidString):medication:\(index)",
+                        metricID: metric.id,
+                        name: "\(metric.name): \(medicationName)",
+                        kind: .number,
+                        role: metric.role,
+                        values: values
+                    ))
+                }
+                continue
+            }
+
             guard let values = dailyValues[metric.id], !values.isEmpty else { continue }
-            if metric.kind == .note, metric.aggregation == .count {
+            if metric.kind == .event, metric.aggregation == .count {
                 result.append(Series(
                     identity: metric.id.uuidString,
                     metricID: metric.id,
@@ -305,6 +360,10 @@ enum CorrelationEngine {
             }
         }
         return result
+    }
+
+    private static func selectedChoices(in value: String) -> Set<String> {
+        Set(value.split(separator: "\u{1F}").map(String.init))
     }
 
     private static func matchedPairs(

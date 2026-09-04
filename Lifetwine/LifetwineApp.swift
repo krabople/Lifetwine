@@ -3,6 +3,8 @@ import SwiftUI
 
 @main
 struct LifetwineApp: App {
+    @UIApplicationDelegateAdaptor(LifetwineAppDelegate.self) private var appDelegate
+
     private let container: ModelContainer = {
         let schema = Schema([MetricDefinition.self, MetricEntry.self])
         let configuration = ModelConfiguration(schema: schema, isStoredInMemoryOnly: false)

@@ -89,5 +89,46 @@ final class CorrelationEngineTests: XCTestCase {
         XCTAssertTrue(report.findings.isEmpty)
         XCTAssertEqual(report.daysUntilFirstInsight, 1)
     }
+
+    func testFreeTextNotesAreExcludedFromPatterns() {
+        let noteID = UUID()
+        let moodID = UUID()
+        let metrics = [
+            MetricSnapshot(id: noteID, name: "Diary", kind: .note, role: .influence, aggregation: .count),
+            MetricSnapshot(id: moodID, name: "Mood", kind: .scale, role: .outcome)
+        ]
+        var entries: [EntrySnapshot] = []
+        for day in 0..<20 {
+            let date = calendar.date(byAdding: .day, value: day, to: start)!
+            entries.append(EntrySnapshot(metricID: noteID, timestamp: date, numericValue: Double(day), textValue: "arbitrary words \(day)"))
+            entries.append(EntrySnapshot(metricID: moodID, timestamp: date, numericValue: Double(day)))
+        }
+
+        let report = CorrelationEngine.analyze(metrics: metrics, entries: entries, calendar: calendar)
+
+        XCTAssertTrue(report.findings.isEmpty)
+        XCTAssertEqual(report.correlatedMetricCount, 1)
+    }
+
+    func testMultiChoiceOptionsBecomeSeparateStructuredSignals() {
+        let symptomID = UUID()
+        let energyID = UUID()
+        let metrics = [
+            MetricSnapshot(id: symptomID, name: "Symptoms", kind: .multiChoice, role: .influence, aggregation: .latest, choices: ["Headache", "Nausea"]),
+            MetricSnapshot(id: energyID, name: "Energy", kind: .scale, role: .outcome)
+        ]
+        var entries: [EntrySnapshot] = []
+        for day in 0..<24 {
+            let date = calendar.date(byAdding: .day, value: day, to: start)!
+            let hasHeadache = day % 3 != 0
+            let selections = hasHeadache ? "Headache" : "Nausea"
+            entries.append(EntrySnapshot(metricID: symptomID, timestamp: date, numericValue: 1, textValue: selections))
+            entries.append(EntrySnapshot(metricID: energyID, timestamp: date, numericValue: hasHeadache ? 2 : 5))
+        }
+
+        let report = CorrelationEngine.analyze(metrics: metrics, entries: entries, calendar: calendar)
+
+        XCTAssertTrue(report.findings.contains { $0.sourceName == "Symptoms: Headache" && $0.effect < 0 })
+    }
 }
 

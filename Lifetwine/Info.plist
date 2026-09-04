@@ -20,6 +20,30 @@
     <string>$(CURRENT_PROJECT_VERSION)</string>
     <key>ITSAppUsesNonExemptEncryption</key>
     <false/>
+    <key>CFBundleURLTypes</key>
+    <array>
+        <dict>
+            <key>CFBundleURLName</key>
+            <string>com.krabople.lifetwine</string>
+            <key>CFBundleURLSchemes</key>
+            <array>
+                <string>lifetwine</string>
+            </array>
+        </dict>
+    </array>
+    <key>UIApplicationShortcutItems</key>
+    <array>
+        <dict>
+            <key>UIApplicationShortcutItemIconType</key>
+            <string>UIApplicationShortcutIconTypeAdd</string>
+            <key>UIApplicationShortcutItemTitle</key>
+            <string>Quick Log</string>
+            <key>UIApplicationShortcutItemSubtitle</key>
+            <string>Record anything</string>
+            <key>UIApplicationShortcutItemType</key>
+            <string>com.krabople.lifetwine.quicklog</string>
+        </dict>
+    </array>
     <key>UILaunchScreen</key>
     <dict>
         <key>UIColorName</key>

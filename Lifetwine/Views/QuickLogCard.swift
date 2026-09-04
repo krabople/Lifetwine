@@ -6,10 +6,10 @@ struct QuickLogCard: View {
     let metric: MetricDefinition
 
     @State private var amount: Double
-    @State private var textValue = ""
-    @State private var chosenTime = Date.now
-    @State private var showingDetailEntry = false
-    @State private var justLogged = false
+    @State private var showingDetailedEntry = false
+    @State private var showingMetricEditor = false
+    @State private var entryToEdit: MetricEntry?
+    @State private var lastCreatedEntry: MetricEntry?
 
     init(metric: MetricDefinition) {
         self.metric = metric
@@ -18,48 +18,61 @@ struct QuickLogCard: View {
 
     var body: some View {
         VStack(alignment: .leading, spacing: 14) {
-            HStack(spacing: 12) {
-                Image(systemName: metric.symbol)
-                    .font(.headline)
-                    .foregroundStyle(Color(hex: metric.colorHex))
-                    .frame(width: 38, height: 38)
-                    .background(Color(hex: metric.colorHex).opacity(0.12), in: Circle())
-                VStack(alignment: .leading, spacing: 2) {
-                    Text(metric.name)
-                        .font(.headline)
-                        .foregroundStyle(LifetwineTheme.ink)
-                    if justLogged {
-                        Label("Added", systemImage: "checkmark")
-                            .font(.caption.weight(.bold))
-                            .foregroundStyle(LifetwineTheme.mint)
-                            .transition(.opacity.combined(with: .move(edge: .top)))
-                    } else {
-                        Text(prompt)
-                            .font(.caption)
-                            .foregroundStyle(LifetwineTheme.secondaryInk)
-                    }
-                }
-                Spacer()
-            }
-
+            header
             control
+
+            if let lastCreatedEntry {
+                confirmation(for: lastCreatedEntry)
+                    .transition(.opacity.combined(with: .move(edge: .top)))
+            }
         }
         .padding(16)
         .lifetwineCard()
-        .sheet(isPresented: $showingDetailEntry) {
-            detailSheet
-                .presentationDetents(metric.kind == .time ? [.medium] : [.medium, .large])
+        .sheet(isPresented: $showingDetailedEntry, onDismiss: { entryToEdit = nil }) {
+            EntryEditorView(metric: metric, entry: entryToEdit)
+                .presentationDetents([.large])
+        }
+        .sheet(isPresented: $showingMetricEditor) {
+            MetricEditorView(metric: metric)
         }
     }
 
-    private var prompt: String {
-        switch metric.kind {
-        case .scale: "Tap once to rate"
-        case .number, .duration: "Adjust, then add"
-        case .yesNo: "Tap once to answer"
-        case .choice: "Tap once to choose"
-        case .time: "Log now, or choose a time"
-        case .note: "Capture a quick detail"
+    private var header: some View {
+        HStack(spacing: 12) {
+            Image(systemName: metric.symbol)
+                .font(.headline)
+                .foregroundStyle(Color(hex: metric.colorHex))
+                .frame(width: 38, height: 38)
+                .background(Color(hex: metric.colorHex).opacity(0.12), in: Circle())
+            VStack(alignment: .leading, spacing: 2) {
+                Text(metric.name)
+                    .font(.headline)
+                    .foregroundStyle(LifetwineTheme.ink)
+                Text(metric.prompt)
+                    .font(.caption)
+                    .foregroundStyle(LifetwineTheme.secondaryInk)
+                    .lineLimit(2)
+            }
+            Spacer()
+            Menu {
+                Button {
+                    entryToEdit = nil
+                    showingDetailedEntry = true
+                } label: {
+                    Label("Choose value, date and time", systemImage: "calendar.badge.clock")
+                }
+                Button {
+                    showingMetricEditor = true
+                } label: {
+                    Label("Edit tracker setup", systemImage: "pencil")
+                }
+            } label: {
+                Image(systemName: "ellipsis")
+                    .font(.headline)
+                    .frame(width: 36, height: 36)
+                    .contentShape(Circle())
+            }
+            .accessibilityLabel("More ways to log \(metric.name)")
         }
     }
 
@@ -71,16 +84,13 @@ struct QuickLogCard: View {
                 if scaleValues.count <= 7 {
                     HStack(spacing: 7) {
                         ForEach(scaleValues, id: \.self) { value in
-                            scaleButton(value)
-                                .frame(maxWidth: .infinity)
+                            scaleButton(value).frame(maxWidth: .infinity)
                         }
                     }
                 } else {
                     ScrollView(.horizontal, showsIndicators: false) {
                         HStack(spacing: 7) {
-                            ForEach(scaleValues, id: \.self) { value in
-                                scaleButton(value)
-                            }
+                            ForEach(scaleValues, id: \.self) { value in scaleButton(value) }
                         }
                     }
                 }
@@ -95,79 +105,183 @@ struct QuickLogCard: View {
 
         case .yesNo:
             HStack(spacing: 10) {
-                quickButton(title: "No", icon: "xmark", color: LifetwineTheme.secondaryInk) { log(numeric: 0) }
-                quickButton(title: "Yes", icon: "checkmark", color: Color(hex: metric.colorHex)) { log(numeric: 1) }
+                quickButton(title: metric.noLabel, icon: "xmark", color: LifetwineTheme.secondaryInk) { log(numeric: 0) }
+                quickButton(title: metric.yesLabel, icon: "checkmark", color: Color(hex: metric.colorHex)) { log(numeric: 1) }
             }
 
         case .choice:
-            ScrollView(.horizontal, showsIndicators: false) {
-                HStack(spacing: 9) {
-                    ForEach(Array(metric.choices.enumerated()), id: \.offset) { index, choice in
-                        Button(choice) {
-                            log(numeric: Double(index + 1), text: choice)
-                        }
-                        .font(.subheadline.weight(.semibold))
+            optionScroller(metric.choices) { index, choice in
+                log(numeric: Double(index + 1), text: choice)
+            }
+
+        case .multiChoice:
+            Button {
+                entryToEdit = nil
+                showingDetailedEntry = true
+            } label: {
+                Label("Choose any that apply", systemImage: "checklist")
+                    .font(.subheadline.weight(.bold))
+                    .frame(maxWidth: .infinity, minHeight: 46)
+                    .foregroundStyle(Color(hex: metric.colorHex))
+                    .background(Color(hex: metric.colorHex).opacity(0.1))
+                    .clipShape(RoundedRectangle(cornerRadius: 13, style: .continuous))
+            }
+            .buttonStyle(.plain)
+
+        case .time:
+            HStack(spacing: 10) {
+                quickButton(title: "Now", icon: "clock.fill", color: Color(hex: metric.colorHex)) { logTime(.now) }
+                detailedButton(title: "Earlier", icon: "calendar.badge.clock")
+            }
+
+        case .medication:
+            if metric.medications.isEmpty {
+                Button {
+                    showingMetricEditor = true
+                } label: {
+                    Label("Add your medications and doses", systemImage: "pills.fill")
+                        .font(.subheadline.weight(.bold))
+                        .frame(maxWidth: .infinity, minHeight: 46)
                         .foregroundStyle(Color(hex: metric.colorHex))
-                        .padding(.horizontal, 15)
-                        .frame(minHeight: 40)
                         .background(Color(hex: metric.colorHex).opacity(0.1))
-                        .clipShape(Capsule())
+                        .clipShape(RoundedRectangle(cornerRadius: 13, style: .continuous))
+                }
+                .buttonStyle(.plain)
+            } else {
+                ScrollView(.horizontal, showsIndicators: false) {
+                    HStack(spacing: 9) {
+                        ForEach(metric.medications) { medication in
+                            Button {
+                                log(numeric: medication.defaultDose, text: medication.name, unit: medication.unit)
+                            } label: {
+                                VStack(spacing: 2) {
+                                    Text(medication.name).fontWeight(.semibold)
+                                    Text("\(medication.defaultDose.formatted()) \(medication.unit)")
+                                        .font(.caption2)
+                                }
+                                .padding(.horizontal, 14)
+                                .frame(minHeight: 46)
+                                .foregroundStyle(Color(hex: metric.colorHex))
+                                .background(Color(hex: metric.colorHex).opacity(0.1))
+                                .clipShape(Capsule())
+                            }
+                            .buttonStyle(.plain)
+                        }
+                        detailedButton(title: "Other", icon: "slider.horizontal.3")
                     }
                 }
             }
 
-        case .time:
-            HStack(spacing: 10) {
-                quickButton(title: "Now", icon: "clock.fill", color: Color(hex: metric.colorHex)) {
-                    logTime(.now)
+        case .number, .duration:
+            VStack(spacing: 10) {
+                if !metric.quickValues.isEmpty {
+                    optionScroller(metric.quickValues) { _, value in
+                        log(numeric: value)
+                    }
                 }
-                Button {
-                    chosenTime = .now
-                    showingDetailEntry = true
-                } label: {
-                    Image(systemName: "calendar.badge.clock")
-                        .font(.headline)
-                        .frame(width: 48, height: 44)
-                        .background(LifetwineTheme.canvas)
+                HStack(spacing: 10) {
+                    stepButton(systemName: "minus", delta: -metric.stepValue)
+                    Text(formatted(amount))
+                        .font(.title3.monospacedDigit().weight(.bold))
+                        .foregroundStyle(LifetwineTheme.ink)
+                        .frame(maxWidth: .infinity)
+                        .lineLimit(1)
+                        .minimumScaleFactor(0.7)
+                    stepButton(systemName: "plus", delta: metric.stepValue)
+                    Button("Add") { log(numeric: amount) }
+                        .font(.subheadline.weight(.bold))
+                        .foregroundStyle(.white)
+                        .padding(.horizontal, 19)
+                        .frame(height: 44)
+                        .background(Color(hex: metric.colorHex))
                         .clipShape(RoundedRectangle(cornerRadius: 13, style: .continuous))
                 }
-                .buttonStyle(.plain)
-                .accessibilityLabel("Choose another time")
             }
 
-        case .number, .duration:
+        case .counter:
             HStack(spacing: 10) {
-                stepButton(systemName: "minus", delta: -metric.stepValue)
-                Text(formattedAmount)
-                    .font(.title3.monospacedDigit().weight(.bold))
-                    .foregroundStyle(LifetwineTheme.ink)
-                    .frame(maxWidth: .infinity)
-                    .lineLimit(1)
-                    .minimumScaleFactor(0.7)
-                stepButton(systemName: "plus", delta: metric.stepValue)
-                Button("Add") { log(numeric: amount) }
-                    .font(.subheadline.weight(.bold))
-                    .foregroundStyle(.white)
-                    .padding(.horizontal, 19)
-                    .frame(height: 44)
-                    .background(Color(hex: metric.colorHex))
-                    .clipShape(RoundedRectangle(cornerRadius: 13, style: .continuous))
+                quickButton(title: "+ \(formatted(metric.defaultValue))", icon: "plus", color: Color(hex: metric.colorHex)) {
+                    log(numeric: metric.defaultValue)
+                }
+                detailedButton(title: "Other", icon: "slider.horizontal.3")
+            }
+
+        case .event:
+            HStack(spacing: 10) {
+                quickButton(title: "Log now", icon: "checkmark.circle.fill", color: Color(hex: metric.colorHex)) {
+                    log(numeric: 1)
+                }
+                detailedButton(title: "Details", icon: "text.badge.plus")
             }
 
         case .note:
             Button {
-                textValue = ""
-                showingDetailEntry = true
+                entryToEdit = nil
+                showingDetailedEntry = true
             } label: {
-                Label("Add a note", systemImage: "plus")
+                Label("Write or dictate a note", systemImage: "mic.badge.plus")
                     .font(.subheadline.weight(.bold))
-                    .frame(maxWidth: .infinity, minHeight: 44)
+                    .frame(maxWidth: .infinity, minHeight: 46)
                     .foregroundStyle(Color(hex: metric.colorHex))
                     .background(Color(hex: metric.colorHex).opacity(0.1))
                     .clipShape(RoundedRectangle(cornerRadius: 13, style: .continuous))
             }
             .buttonStyle(.plain)
         }
+    }
+
+    private func optionScroller<T: Hashable>(_ values: [T], action: @escaping (Int, T) -> Void) -> some View where T: CustomStringConvertible {
+        ScrollView(.horizontal, showsIndicators: false) {
+            HStack(spacing: 9) {
+                ForEach(Array(values.enumerated()), id: \.offset) { index, value in
+                    Button(display(value)) { action(index, value) }
+                        .font(.subheadline.weight(.semibold))
+                        .foregroundStyle(Color(hex: metric.colorHex))
+                        .padding(.horizontal, 15)
+                        .frame(minHeight: 42)
+                        .background(Color(hex: metric.colorHex).opacity(0.1))
+                        .clipShape(Capsule())
+                }
+            }
+        }
+    }
+
+    private func display<T>(_ value: T) -> String {
+        if let number = value as? Double { return formatted(number) }
+        return String(describing: value)
+    }
+
+    private func detailedButton(title: String, icon: String) -> some View {
+        Button {
+            entryToEdit = nil
+            showingDetailedEntry = true
+        } label: {
+            Label(title, systemImage: icon)
+                .font(.subheadline.weight(.bold))
+                .frame(minWidth: 82, minHeight: 44)
+                .padding(.horizontal, 8)
+                .foregroundStyle(Color(hex: metric.colorHex))
+                .background(Color(hex: metric.colorHex).opacity(0.1))
+                .clipShape(RoundedRectangle(cornerRadius: 13, style: .continuous))
+        }
+        .buttonStyle(.plain)
+    }
+
+    private func confirmation(for entry: MetricEntry) -> some View {
+        HStack(spacing: 10) {
+            Label("Added", systemImage: "checkmark.circle.fill")
+                .font(.caption.weight(.bold))
+                .foregroundStyle(LifetwineTheme.mint)
+            Spacer()
+            Button("Change time") {
+                entryToEdit = entry
+                showingDetailedEntry = true
+            }
+            Button("Undo") { undo(entry) }
+                .foregroundStyle(LifetwineTheme.coral)
+        }
+        .font(.caption.weight(.semibold))
+        .padding(.top, 2)
     }
 
     private func quickButton(title: String, icon: String, color: Color, action: @escaping () -> Void) -> some View {
@@ -198,15 +312,14 @@ struct QuickLogCard: View {
     }
 
     private var scaleValues: [Double] {
-        let count = Int(((metric.maximumValue - metric.minimumValue) / max(metric.stepValue, 1)).rounded(.down)) + 1
-        return (0..<max(1, min(count, 101))).map { metric.minimumValue + Double($0) * max(metric.stepValue, 1) }
+        let interval = max(metric.stepValue, 0.01)
+        let count = Int(((metric.maximumValue - metric.minimumValue) / interval).rounded(.down)) + 1
+        return (0..<max(1, min(count, 101))).map { metric.minimumValue + Double($0) * interval }
     }
 
     private func scaleButton(_ value: Double) -> some View {
-        Button {
-            log(numeric: value)
-        } label: {
-            Text(value.formatted(.number.precision(.fractionLength(0...1))))
+        Button { log(numeric: value) } label: {
+            Text(value.formatted(.number.precision(.fractionLength(0...2))))
                 .font(.subheadline.weight(.bold))
                 .frame(minWidth: 42, minHeight: 40)
                 .background(Color(hex: metric.colorHex).opacity(0.1))
@@ -217,50 +330,13 @@ struct QuickLogCard: View {
         .accessibilityLabel("\(metric.name), \(value.formatted()) out of \(metric.maximumValue.formatted())")
     }
 
-    private var formattedAmount: String {
-        let number = amount.formatted(.number.precision(.fractionLength(0...2)))
+    private func formatted(_ value: Double) -> String {
+        let number = value.formatted(.number.precision(.fractionLength(0...2)))
         if metric.kind == .duration && metric.unit.lowercased().hasPrefix("minute") {
-            let minutes = Int(amount.rounded())
+            let minutes = Int(value.rounded())
             return minutes >= 60 ? "\(minutes / 60)h \(minutes % 60)m" : "\(minutes) min"
         }
         return metric.unit.isEmpty ? number : "\(number) \(metric.unit)"
-    }
-
-    @ViewBuilder
-    private var detailSheet: some View {
-        NavigationStack {
-            Form {
-                if metric.kind == .time {
-                    DatePicker("When?", selection: $chosenTime, displayedComponents: [.date, .hourAndMinute])
-                        .datePickerStyle(.graphical)
-                } else {
-                    Section("What would you like to remember?") {
-                        TextField("Type here", text: $textValue, axis: .vertical)
-                            .lineLimit(3...8)
-                    }
-                    Section {
-                        Text("The words stay searchable in your journal. Lifetwine compares whether and how often the event occurred; use a choice, rating or number tracker for more detailed patterns.")
-                            .font(.footnote)
-                            .foregroundStyle(.secondary)
-                    }
-                }
-            }
-            .navigationTitle(metric.name)
-            .navigationBarTitleDisplayMode(.inline)
-            .toolbar {
-                ToolbarItem(placement: .cancellationAction) {
-                    Button("Cancel") { showingDetailEntry = false }
-                }
-                ToolbarItem(placement: .confirmationAction) {
-                    Button("Add") {
-                        if metric.kind == .time { logTime(chosenTime) }
-                        else { log(numeric: 1, text: textValue.trimmingCharacters(in: .whitespacesAndNewlines)) }
-                        showingDetailEntry = false
-                    }
-                    .fontWeight(.bold)
-                }
-            }
-        }
     }
 
     private func logTime(_ date: Date) {
@@ -269,16 +345,20 @@ struct QuickLogCard: View {
         log(numeric: minutes, timestamp: date)
     }
 
-    private func log(numeric: Double? = nil, text: String = "", timestamp: Date = .now) {
-        let entry = MetricEntry(timestamp: timestamp, numericValue: numeric, textValue: text, metric: metric)
+    private func log(numeric: Double? = nil, text: String = "", unit: String? = nil, timestamp: Date = .now) {
+        let entry = MetricEntry(timestamp: timestamp, numericValue: numeric, textValue: text, valueUnit: unit, metric: metric)
         modelContext.insert(entry)
+        metric.lastUsedAt = .now
         try? modelContext.save()
         Haptics.logged()
-        withAnimation(.easeOut(duration: 0.2)) { justLogged = true }
-        Task { @MainActor in
-            try? await Task.sleep(for: .seconds(1.3))
-            withAnimation(.easeIn(duration: 0.2)) { justLogged = false }
-        }
+        withAnimation(.easeOut(duration: 0.2)) { lastCreatedEntry = entry }
+    }
+
+    private func undo(_ entry: MetricEntry) {
+        modelContext.delete(entry)
+        try? modelContext.save()
+        withAnimation { lastCreatedEntry = nil }
+        Haptics.selected()
     }
 }
 

@@ -7,7 +7,7 @@ struct CSVExportDocument: FileDocument {
 
     init(entries: [MetricEntry] = []) {
         let formatter = ISO8601DateFormatter()
-        var lines = ["date,tracker,type,value,unit,note"]
+        var lines = ["date,tracker,type,value,unit,note,is_sample"]
         for entry in entries {
             let metric = entry.metric
             let rawValue = entry.textValue.isEmpty
@@ -18,8 +18,9 @@ struct CSVExportDocument: FileDocument {
                 metric?.name ?? "",
                 metric?.kind.title ?? "",
                 rawValue,
-                metric?.unit ?? "",
-                entry.note
+                entry.valueUnit ?? metric?.unit ?? "",
+                entry.note,
+                entry.isSample == true ? "true" : "false"
             ]
             lines.append(columns.map(Self.escape).joined(separator: ","))
         }

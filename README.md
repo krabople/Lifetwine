@@ -6,22 +6,27 @@ Lifetwine is a private, native iPhone app for logging anything in seconds and di
 
 ## What is included
 
-- One-tap logging for ratings, yes/no questions, choices, and current time
-- Fast steppers for amounts and durations
-- Free-text notes and event details
-- Fully custom trackers with colours, symbols, ranges, units, choices, and daily aggregation rules
-- A clean chronological journal with search and swipe-to-delete
+- Unlimited user-created trackers for ratings, measurements, counters, durations, yes/no answers, single or multiple choices, times, medications, events, and notes
+- One-tap values, editable prompts, custom answer labels, colours, symbols, ranges, units, choices, and daily aggregation rules
+- A reusable medication list with usual dose and unit, while keeping every logged dose editable
+- A searchable universal logger plus a fully customisable and reorderable Today screen
+- Backdated logging with shortcuts for now, an hour ago, earlier today, yesterday, or any previous date
+- A clean chronological journal with search, edit, repeat, and delete actions
+- Siri and Shortcuts support, an app-icon Quick Log action, and `lifetwine://log` deep linking
 - A correlation engine that:
   - compares influences with outcomes
   - tests same-day, one-day, and two-day delays
   - combines Pearson and Spearman correlations for outlier resistance
   - uses Benjamini–Hochberg false-discovery-rate adjustment to filter likely coincidences
-  - requires at least seven matched days
+  - treats structured selections and individual medications as separate signals
+  - keeps free text searchable but deliberately excludes it from numerical correlations
+  - requires at least seven matched days before showing a tentative comparison
 - Plain-language findings with strength, timing, sample size, and an evidence score
+- 21 days of clearly labelled sample history, removable at any time, for immediately exploring Patterns
 - CSV export
 - Local SwiftData storage with no account, ads, analytics, or network service
 - A custom 1024×1024 app icon
-- Unit tests for strong, delayed, constant-value, and insufficient-data cases
+- Unit tests for strong, delayed, constant-value, insufficient-data, free-text exclusion, and multi-choice cases
 
 ## Open and run
 

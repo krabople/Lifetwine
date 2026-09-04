@@ -3,9 +3,11 @@ import SwiftUI
 
 struct TodayView: View {
     @Binding var selectedTab: Int
+    @Binding var showingGlobalLogger: Bool
     @Query(sort: \MetricDefinition.sortOrder) private var metrics: [MetricDefinition]
     @Query(sort: \MetricEntry.timestamp, order: .reverse) private var entries: [MetricEntry]
-    @State private var showingAllTrackers = false
+    @State private var showingCustomization = false
+    @State private var editingEntry: MetricEntry?
 
     private var pinnedMetrics: [MetricDefinition] {
         metrics.filter { $0.isPinned && !$0.isArchived }
@@ -35,12 +37,34 @@ struct TodayView: View {
                     LazyVStack(spacing: 16) {
                         header
 
+                        Button {
+                            showingGlobalLogger = true
+                        } label: {
+                            HStack(spacing: 12) {
+                                Image(systemName: "plus.circle.fill")
+                                    .font(.title2)
+                                VStack(alignment: .leading, spacing: 2) {
+                                    Text("Log or create anything")
+                                        .font(.headline)
+                                    Text("Search every tracker, or make a new one")
+                                        .font(.caption)
+                                        .foregroundStyle(LifetwineTheme.secondaryInk)
+                                }
+                                Spacer()
+                                Image(systemName: "magnifyingglass")
+                            }
+                            .foregroundStyle(LifetwineTheme.indigo)
+                            .padding(16)
+                            .lifetwineCard()
+                        }
+                        .buttonStyle(.plain)
+
                         HStack {
                             Text("Quick log")
                                 .font(.title3.weight(.bold))
                                 .foregroundStyle(LifetwineTheme.ink)
                             Spacer()
-                            Button("All \(activeMetrics.count)") { showingAllTrackers = true }
+                            Button("Customise") { showingCustomization = true }
                                 .font(.subheadline.weight(.semibold))
                         }
                         .padding(.horizontal, 4)
@@ -88,9 +112,16 @@ struct TodayView: View {
                 }
             }
             .toolbar(.hidden, for: .navigationBar)
-            .sheet(isPresented: $showingAllTrackers) {
-                AllTrackersSheet(metrics: activeMetrics)
-                    .presentationDetents([.large])
+            .sheet(isPresented: $showingGlobalLogger) {
+                UniversalLoggerView()
+            }
+            .sheet(isPresented: $showingCustomization) {
+                TodayCustomizationView()
+            }
+            .sheet(item: $editingEntry) { entry in
+                if let metric = entry.metric {
+                    EntryEditorView(metric: metric, entry: entry)
+                }
             }
         }
     }
@@ -138,7 +169,7 @@ struct TodayView: View {
 
     private var emptyPinnedCard: some View {
         Button {
-            selectedTab = 3
+            showingCustomization = true
         } label: {
             VStack(spacing: 10) {
                 Image(systemName: "pin")
@@ -165,38 +196,15 @@ struct TodayView: View {
 
             VStack(spacing: 0) {
                 ForEach(Array(todayEntries.prefix(4).enumerated()), id: \.element.id) { index, entry in
-                    EntryRow(entry: entry)
+                    Button { editingEntry = entry } label: {
+                        EntryRow(entry: entry)
+                    }
+                    .buttonStyle(.plain)
                     if index < min(todayEntries.count, 4) - 1 { Divider().padding(.leading, 58) }
                 }
             }
             .padding(.vertical, 5)
             .lifetwineCard()
-        }
-    }
-}
-
-private struct AllTrackersSheet: View {
-    let metrics: [MetricDefinition]
-    @Environment(\.dismiss) private var dismiss
-
-    var body: some View {
-        NavigationStack {
-            ScrollView {
-                LazyVStack(spacing: 14) {
-                    ForEach(metrics) { metric in
-                        QuickLogCard(metric: metric)
-                    }
-                }
-                .padding(16)
-            }
-            .background(LifetwineTheme.canvas)
-            .navigationTitle("Log anything")
-            .navigationBarTitleDisplayMode(.inline)
-            .toolbar {
-                ToolbarItem(placement: .confirmationAction) {
-                    Button("Done") { dismiss() }
-                }
-            }
         }
     }
 }

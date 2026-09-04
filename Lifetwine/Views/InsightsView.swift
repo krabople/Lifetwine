@@ -2,6 +2,7 @@ import SwiftData
 import SwiftUI
 
 struct InsightsView: View {
+    @Environment(\.modelContext) private var modelContext
     @Query(sort: \MetricDefinition.sortOrder) private var metrics: [MetricDefinition]
     @Query(sort: \MetricEntry.timestamp) private var entries: [MetricEntry]
     @State private var report = InsightReport(findings: [], loggedDays: 0, bestMatchedDays: 0, loggedValues: 0, correlatedMetricCount: 0)
@@ -14,6 +15,10 @@ struct InsightsView: View {
                 ScrollView {
                     LazyVStack(alignment: .leading, spacing: 18) {
                         insightHeader
+
+                        if sampleEntryCount > 0 {
+                            sampleDataCard
+                        }
 
                         if report.findings.isEmpty {
                             learningCard
@@ -49,6 +54,32 @@ struct InsightsView: View {
         }
     }
 
+    private var sampleEntryCount: Int { entries.filter { $0.isSample == true }.count }
+
+    private var sampleDataCard: some View {
+        HStack(alignment: .top, spacing: 12) {
+            Image(systemName: "wand.and.stars")
+                .foregroundStyle(LifetwineTheme.indigo)
+                .frame(width: 34, height: 34)
+                .background(LifetwineTheme.indigo.opacity(0.1), in: Circle())
+            VStack(alignment: .leading, spacing: 4) {
+                Text("Showing sample patterns")
+                    .font(.subheadline.weight(.bold))
+                Text("These results include \(sampleEntryCount) clearly marked demo logs from the previous three weeks, so you can explore this screen immediately.")
+                    .font(.caption)
+                    .foregroundStyle(.secondary)
+            }
+            Spacer()
+            Button("Remove") {
+                SampleDataLibrary.remove(in: modelContext)
+                refreshReport()
+            }
+            .font(.caption.weight(.bold))
+        }
+        .padding(14)
+        .lifetwineCard()
+    }
+
     private var insightHeader: some View {
         VStack(alignment: .leading, spacing: 16) {
             HStack {
@@ -70,7 +101,7 @@ struct InsightsView: View {
                 VStack(alignment: .leading, spacing: 8) {
                     ProgressView(value: min(1, Double(report.bestMatchedDays) / Double(CorrelationEngine.minimumPairs)))
                         .tint(.white)
-                    Text("Log on \(report.daysUntilFirstInsight) more day\(report.daysUntilFirstInsight == 1 ? "" : "s") to unlock an early pattern")
+                    Text("Log both sides on \(report.daysUntilFirstInsight) more day\(report.daysUntilFirstInsight == 1 ? "" : "s") to unlock your first comparison")
                         .font(.caption.weight(.semibold))
                 }
             } else {
@@ -100,7 +131,7 @@ struct InsightsView: View {
                 VStack(alignment: .leading, spacing: 2) {
                     Text(report.bestMatchedDays < CorrelationEngine.minimumPairs ? "A little data goes a long way" : "No dependable pattern yet")
                         .font(.headline)
-                    Text(report.bestMatchedDays < CorrelationEngine.minimumPairs ? "Seven matched days is enough to begin." : "Keep logging — variation helps patterns emerge.")
+                    Text(report.bestMatchedDays < CorrelationEngine.minimumPairs ? "A matched day means you logged two comparable trackers on the same day. Lifetwine waits for at least seven before showing a tentative result." : "Keep logging — variation helps patterns emerge.")
                         .font(.subheadline)
                         .foregroundStyle(.secondary)
                 }
@@ -110,6 +141,7 @@ struct InsightsView: View {
                 tip("Log outcomes like mood or energy once a day", icon: "face.smiling")
                 tip("Log influences when they happen", icon: "clock.arrow.circlepath")
                 tip("Consistency matters more than logging everything", icon: "checkmark.circle")
+                tip("You can edit dates, times and values later in Journal", icon: "pencil.circle")
             }
         }
         .padding(18)
@@ -127,7 +159,7 @@ struct InsightsView: View {
             Label("Careful by design", systemImage: "shield.lefthalf.filled")
                 .font(.headline)
                 .foregroundStyle(LifetwineTheme.ink)
-            Text("Lifetwine checks same-day patterns and delays of one or two days. It reduces the influence of unusual values and filters likely coincidences. Patterns are clues, not proof that one thing caused another.")
+            Text("Lifetwine compares structured values—ratings, amounts, doses, choices, events, durations and times—on the same day and after delays of one or two days. Free-text notes stay searchable but are never treated as numerical evidence. It reduces the influence of unusual values and filters likely coincidences. Patterns are clues, not proof that one thing caused another.")
                 .font(.footnote)
                 .foregroundStyle(LifetwineTheme.secondaryInk)
                 .fixedSize(horizontal: false, vertical: true)

@@ -23,6 +23,10 @@
 		A0000000000000000000000F /* MetricEditorView.swift in Sources */ = {isa = PBXBuildFile; fileRef = C0000000000000000000000F /* MetricEditorView.swift */; };
 		A00000000000000000000010 /* Assets.xcassets in Resources */ = {isa = PBXBuildFile; fileRef = C00000000000000000000010 /* Assets.xcassets */; };
 		A00000000000000000000011 /* CorrelationEngineTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = C00000000000000000000012 /* CorrelationEngineTests.swift */; };
+		A00000000000000000000012 /* QuickAccess.swift in Sources */ = {isa = PBXBuildFile; fileRef = C00000000000000000000015 /* QuickAccess.swift */; };
+		A00000000000000000000013 /* SampleDataLibrary.swift in Sources */ = {isa = PBXBuildFile; fileRef = C00000000000000000000016 /* SampleDataLibrary.swift */; };
+		A00000000000000000000014 /* EntryEditorView.swift in Sources */ = {isa = PBXBuildFile; fileRef = C00000000000000000000017 /* EntryEditorView.swift */; };
+		A00000000000000000000015 /* UniversalLoggerView.swift in Sources */ = {isa = PBXBuildFile; fileRef = C00000000000000000000018 /* UniversalLoggerView.swift */; };
 /* End PBXBuildFile section */
 
 /* Begin PBXContainerItemProxy section */
@@ -56,6 +60,10 @@
 		C00000000000000000000012 /* CorrelationEngineTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CorrelationEngineTests.swift; sourceTree = "<group>"; };
 		C00000000000000000000013 /* Lifetwine.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = Lifetwine.app; sourceTree = BUILT_PRODUCTS_DIR; };
 		C00000000000000000000014 /* LifetwineTests.xctest */ = {isa = PBXFileReference; explicitFileType = wrapper.cfbundle; includeInIndex = 0; path = LifetwineTests.xctest; sourceTree = BUILT_PRODUCTS_DIR; };
+		C00000000000000000000015 /* QuickAccess.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = QuickAccess.swift; sourceTree = "<group>"; };
+		C00000000000000000000016 /* SampleDataLibrary.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SampleDataLibrary.swift; sourceTree = "<group>"; };
+		C00000000000000000000017 /* EntryEditorView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = EntryEditorView.swift; sourceTree = "<group>"; };
+		C00000000000000000000018 /* UniversalLoggerView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = UniversalLoggerView.swift; sourceTree = "<group>"; };
 /* End PBXFileReference section */
 
 /* Begin PBXFrameworksBuildPhase section */
@@ -78,8 +86,8 @@
 		D00000000000000000000002 /* LifetwineTests */ = {isa = PBXGroup; children = (C00000000000000000000012 /* CorrelationEngineTests.swift */); path = LifetwineTests; sourceTree = "<group>"; };
 		D00000000000000000000003 /* Products */ = {isa = PBXGroup; children = (C00000000000000000000013 /* Lifetwine.app */, C00000000000000000000014 /* LifetwineTests.xctest */); name = Products; sourceTree = "<group>"; };
 		D00000000000000000000004 /* Models */ = {isa = PBXGroup; children = (C00000000000000000000002 /* MetricDefinition.swift */, C00000000000000000000003 /* MetricEntry.swift */); path = Models; sourceTree = "<group>"; };
-		D00000000000000000000005 /* Services */ = {isa = PBXGroup; children = (C00000000000000000000005 /* StarterLibrary.swift */, C00000000000000000000006 /* CorrelationEngine.swift */, C00000000000000000000007 /* CSVExportDocument.swift */); path = Services; sourceTree = "<group>"; };
-		D00000000000000000000006 /* Views */ = {isa = PBXGroup; children = (C00000000000000000000008 /* RootView.swift */, C00000000000000000000009 /* TodayView.swift */, C0000000000000000000000A /* QuickLogCard.swift */, C0000000000000000000000B /* EntryRow.swift */, C0000000000000000000000C /* HistoryView.swift */, C0000000000000000000000D /* InsightsView.swift */, C0000000000000000000000E /* TrackersView.swift */, C0000000000000000000000F /* MetricEditorView.swift */); path = Views; sourceTree = "<group>"; };
+		D00000000000000000000005 /* Services */ = {isa = PBXGroup; children = (C00000000000000000000005 /* StarterLibrary.swift */, C00000000000000000000006 /* CorrelationEngine.swift */, C00000000000000000000007 /* CSVExportDocument.swift */, C00000000000000000000015 /* QuickAccess.swift */, C00000000000000000000016 /* SampleDataLibrary.swift */); path = Services; sourceTree = "<group>"; };
+		D00000000000000000000006 /* Views */ = {isa = PBXGroup; children = (C00000000000000000000008 /* RootView.swift */, C00000000000000000000009 /* TodayView.swift */, C0000000000000000000000A /* QuickLogCard.swift */, C0000000000000000000000B /* EntryRow.swift */, C0000000000000000000000C /* HistoryView.swift */, C0000000000000000000000D /* InsightsView.swift */, C0000000000000000000000E /* TrackersView.swift */, C0000000000000000000000F /* MetricEditorView.swift */, C00000000000000000000017 /* EntryEditorView.swift */, C00000000000000000000018 /* UniversalLoggerView.swift */); path = Views; sourceTree = "<group>"; };
 /* End PBXGroup section */
 
 /* Begin PBXNativeTarget section */
@@ -138,7 +146,7 @@
 /* End PBXResourcesBuildPhase section */
 
 /* Begin PBXSourcesBuildPhase section */
-		E00000000000000000000002 /* Sources */ = {isa = PBXSourcesBuildPhase; buildActionMask = 2147483647; files = (A00000000000000000000001, A00000000000000000000002, A00000000000000000000003, A00000000000000000000004, A00000000000000000000005, A00000000000000000000006, A00000000000000000000007, A00000000000000000000008, A00000000000000000000009, A0000000000000000000000A, A0000000000000000000000B, A0000000000000000000000C, A0000000000000000000000D, A0000000000000000000000E, A0000000000000000000000F); runOnlyForDeploymentPostprocessing = 0; };
+		E00000000000000000000002 /* Sources */ = {isa = PBXSourcesBuildPhase; buildActionMask = 2147483647; files = (A00000000000000000000001, A00000000000000000000002, A00000000000000000000003, A00000000000000000000004, A00000000000000000000005, A00000000000000000000006, A00000000000000000000007, A00000000000000000000008, A00000000000000000000009, A0000000000000000000000A, A0000000000000000000000B, A0000000000000000000000C, A0000000000000000000000D, A0000000000000000000000E, A0000000000000000000000F, A00000000000000000000012, A00000000000000000000013, A00000000000000000000014, A00000000000000000000015); runOnlyForDeploymentPostprocessing = 0; };
 		E00000000000000000000005 /* Sources */ = {isa = PBXSourcesBuildPhase; buildActionMask = 2147483647; files = (A00000000000000000000011 /* CorrelationEngineTests.swift in Sources */); runOnlyForDeploymentPostprocessing = 0; };
 /* End PBXSourcesBuildPhase section */
 

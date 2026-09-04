@@ -5,6 +5,8 @@ struct HistoryView: View {
     @Environment(\.modelContext) private var modelContext
     @Query(sort: \MetricEntry.timestamp, order: .reverse) private var entries: [MetricEntry]
     @State private var searchText = ""
+    @State private var editingEntry: MetricEntry?
+    @State private var showingLogger = false
 
     private var filteredEntries: [MetricEntry] {
         guard !searchText.isEmpty else { return entries }
@@ -36,9 +38,27 @@ struct HistoryView: View {
                         ForEach(groupedEntries, id: \.0) { day, dayEntries in
                             Section {
                                 ForEach(dayEntries) { entry in
-                                    EntryRow(entry: entry)
-                                        .listRowInsets(EdgeInsets())
-                                        .listRowBackground(Color.white)
+                                    Button { editingEntry = entry } label: {
+                                        EntryRow(entry: entry)
+                                    }
+                                    .buttonStyle(.plain)
+                                    .listRowInsets(EdgeInsets())
+                                    .listRowBackground(Color.white)
+                                    .swipeActions(edge: .leading, allowsFullSwipe: false) {
+                                        Button {
+                                            editingEntry = entry
+                                        } label: {
+                                            Label("Edit", systemImage: "pencil")
+                                        }
+                                        .tint(LifetwineTheme.indigo)
+
+                                        Button {
+                                            duplicate(entry)
+                                        } label: {
+                                            Label("Repeat", systemImage: "plus.square.on.square")
+                                        }
+                                        .tint(LifetwineTheme.mint)
+                                    }
                                         .swipeActions(edge: .trailing) {
                                             Button(role: .destructive) {
                                                 modelContext.delete(entry)
@@ -63,6 +83,21 @@ struct HistoryView: View {
             }
             .navigationTitle("Journal")
             .searchable(text: $searchText, prompt: "Search what you logged")
+            .toolbar {
+                ToolbarItem(placement: .primaryAction) {
+                    Button { showingLogger = true } label: {
+                        Label("Log anything", systemImage: "plus")
+                    }
+                }
+            }
+            .sheet(item: $editingEntry) { entry in
+                if let metric = entry.metric {
+                    EntryEditorView(metric: metric, entry: entry)
+                }
+            }
+            .sheet(isPresented: $showingLogger) {
+                UniversalLoggerView()
+            }
         }
     }
 
@@ -70,6 +105,21 @@ struct HistoryView: View {
         if Calendar.current.isDateInToday(date) { return "Today" }
         if Calendar.current.isDateInYesterday(date) { return "Yesterday" }
         return date.formatted(.dateTime.weekday(.wide).day().month(.wide))
+    }
+
+    private func duplicate(_ entry: MetricEntry) {
+        guard let metric = entry.metric else { return }
+        let copy = MetricEntry(
+            timestamp: .now,
+            numericValue: entry.numericValue,
+            textValue: entry.textValue,
+            note: entry.note,
+            metric: metric
+        )
+        modelContext.insert(copy)
+        metric.lastUsedAt = .now
+        try? modelContext.save()
+        Haptics.logged()
     }
 }
 

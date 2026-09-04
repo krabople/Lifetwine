@@ -4,10 +4,14 @@ import SwiftData
 enum MetricKind: String, Codable, CaseIterable, Identifiable, Sendable {
     case scale
     case number
+    case counter
     case duration
     case yesNo
     case choice
+    case multiChoice
     case time
+    case medication
+    case event
     case note
 
     var id: String { rawValue }
@@ -15,24 +19,32 @@ enum MetricKind: String, Codable, CaseIterable, Identifiable, Sendable {
     var title: String {
         switch self {
         case .scale: "Rating"
-        case .number: "Number"
+        case .number: "Amount or measurement"
+        case .counter: "One-tap counter"
         case .duration: "Duration"
         case .yesNo: "Yes or no"
-        case .choice: "Choice"
-        case .time: "Time"
-        case .note: "Note or event"
+        case .choice: "Pick one option"
+        case .multiChoice: "Pick several options"
+        case .time: "Date and time"
+        case .medication: "Medication and dose"
+        case .event: "One-tap event"
+        case .note: "Text or note"
         }
     }
 
     var explanation: String {
         switch self {
-        case .scale: "Tap a point on a simple scale"
-        case .number: "Record an amount, such as water or weight"
+        case .scale: "Tap a point on a scale you define"
+        case .number: "Record any amount, measurement, dose or quantity"
+        case .counter: "Add a fixed amount with one tap"
         case .duration: "Record minutes or hours"
-        case .yesNo: "A quick two-option check-in"
-        case .choice: "Pick from your own list"
-        case .time: "Record when something happened"
-        case .note: "Capture words, details, or an event"
+        case .yesNo: "Two labels you define, such as Taken / Skipped"
+        case .choice: "Pick one item from an unlimited list"
+        case .multiChoice: "Pick any number from your own list"
+        case .time: "Record when something happened, now or in the past"
+        case .medication: "Choose a medication, then record its dose and unit"
+        case .event: "Record that anything happened with one tap"
+        case .note: "Capture words, details, symptoms, food or anything else"
         }
     }
 
@@ -40,12 +52,30 @@ enum MetricKind: String, Codable, CaseIterable, Identifiable, Sendable {
         switch self {
         case .scale: "slider.horizontal.3"
         case .number: "number"
+        case .counter: "plus.circle.fill"
         case .duration: "timer"
         case .yesNo: "checkmark.circle"
         case .choice: "square.grid.2x2"
+        case .multiChoice: "checklist"
         case .time: "clock"
+        case .medication: "pills.fill"
+        case .event: "bolt.circle.fill"
         case .note: "text.alignleft"
         }
+    }
+}
+
+struct MedicationOption: Codable, Hashable, Identifiable, Sendable {
+    var id: UUID
+    var name: String
+    var defaultDose: Double
+    var unit: String
+
+    init(id: UUID = UUID(), name: String = "", defaultDose: Double = 1, unit: String = "mg") {
+        self.id = id
+        self.name = name
+        self.defaultDose = defaultDose
+        self.unit = unit
     }
 }
 
@@ -96,6 +126,13 @@ final class MetricDefinition {
     var sortOrder: Int
     var createdAt: Date
     var isArchived: Bool
+    // Optional additions allow existing stores to migrate without losing data.
+    var promptText: String?
+    var quickValuesText: String?
+    var positiveLabel: String?
+    var negativeLabel: String?
+    var lastUsedAt: Date?
+    var structuredOptionsJSON: String?
 
     @Relationship(deleteRule: .cascade, inverse: \MetricEntry.metric)
     var entries: [MetricEntry]
@@ -120,6 +157,12 @@ final class MetricDefinition {
         sortOrder: Int = 0,
         createdAt: Date = .now,
         isArchived: Bool = false,
+        promptText: String = "",
+        quickValues: [Double] = [],
+        positiveLabel: String = "Yes",
+        negativeLabel: String = "No",
+        lastUsedAt: Date? = nil,
+        medications: [MedicationOption] = [],
         entries: [MetricEntry] = []
     ) {
         self.id = id
@@ -141,6 +184,12 @@ final class MetricDefinition {
         self.sortOrder = sortOrder
         self.createdAt = createdAt
         self.isArchived = isArchived
+        self.promptText = promptText
+        self.quickValuesText = quickValues.map { String($0) }.joined(separator: "|")
+        self.positiveLabel = positiveLabel
+        self.negativeLabel = negativeLabel
+        self.lastUsedAt = lastUsedAt
+        self.structuredOptionsJSON = try? String(data: JSONEncoder().encode(medications), encoding: .utf8)
         self.entries = entries
     }
 
@@ -164,6 +213,36 @@ final class MetricDefinition {
         set { choicesText = newValue.joined(separator: "|") }
     }
 
-    var supportsCorrelation: Bool { kind != .note || aggregation == .count }
+    var quickValues: [Double] {
+        get { (quickValuesText ?? "").split(separator: "|").compactMap { Double($0) } }
+        set { quickValuesText = newValue.map { String($0) }.joined(separator: "|") }
+    }
+
+    var prompt: String {
+        let clean = (promptText ?? "").trimmingCharacters(in: .whitespacesAndNewlines)
+        return clean.isEmpty ? kind.explanation : clean
+    }
+
+    var yesLabel: String {
+        let clean = (positiveLabel ?? "").trimmingCharacters(in: .whitespacesAndNewlines)
+        return clean.isEmpty ? "Yes" : clean
+    }
+
+    var noLabel: String {
+        let clean = (negativeLabel ?? "").trimmingCharacters(in: .whitespacesAndNewlines)
+        return clean.isEmpty ? "No" : clean
+    }
+
+    var medications: [MedicationOption] {
+        get {
+            guard let data = (structuredOptionsJSON ?? "").data(using: .utf8) else { return [] }
+            return (try? JSONDecoder().decode([MedicationOption].self, from: data)) ?? []
+        }
+        set {
+            structuredOptionsJSON = try? String(data: JSONEncoder().encode(newValue), encoding: .utf8)
+        }
+    }
+
+    var supportsCorrelation: Bool { kind != .note }
 }
 

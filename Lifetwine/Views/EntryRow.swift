@@ -17,6 +17,11 @@ struct EntryRow: View {
                 Text(entry.timestamp.formatted(date: .omitted, time: .shortened))
                     .font(.caption)
                     .foregroundStyle(.secondary)
+                if entry.isSample == true {
+                    Text("SAMPLE")
+                        .font(.system(size: 9, weight: .bold))
+                        .foregroundStyle(LifetwineTheme.indigo)
+                }
             }
             Spacer()
             Text(entry.formattedValue)

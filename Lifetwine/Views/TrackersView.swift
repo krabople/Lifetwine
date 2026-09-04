@@ -12,13 +12,40 @@ struct TrackersView: View {
     @State private var showingExporter = false
     @State private var exportDocument = CSVExportDocument()
     @State private var showingArchived = false
+    @State private var searchText = ""
 
-    private var activeMetrics: [MetricDefinition] { metrics.filter { !$0.isArchived } }
+    private var activeMetrics: [MetricDefinition] {
+        metrics.filter {
+            !$0.isArchived && (searchText.isEmpty || $0.name.localizedCaseInsensitiveContains(searchText) || $0.kind.title.localizedCaseInsensitiveContains(searchText))
+        }
+    }
     private var archivedMetrics: [MetricDefinition] { metrics.filter(\.isArchived) }
+    private var sampleEntryCount: Int { entries.filter { $0.isSample == true }.count }
 
     var body: some View {
         NavigationStack {
             List {
+                Section {
+                    Button {
+                        editingMetric = nil
+                        showingEditor = true
+                    } label: {
+                        HStack(spacing: 12) {
+                            Image(systemName: "plus.circle.fill")
+                                .font(.title2)
+                                .foregroundStyle(LifetwineTheme.indigo)
+                            VStack(alignment: .leading, spacing: 2) {
+                                Text("Create any tracker")
+                                    .font(.headline)
+                                    .foregroundStyle(LifetwineTheme.ink)
+                                Text("Any subject, any format — no limit")
+                                    .font(.caption)
+                                    .foregroundStyle(.secondary)
+                            }
+                        }
+                    }
+                }
+
                 if activeMetrics.isEmpty {
                     ContentUnavailableView(
                         "Make Lifetwine yours",
@@ -44,6 +71,13 @@ struct TrackersView: View {
                                     Label(metric.isPinned ? "Unpin" : "Quick log", systemImage: metric.isPinned ? "pin.slash" : "pin")
                                 }
                                 .tint(LifetwineTheme.indigo)
+
+                                Button {
+                                    duplicate(metric)
+                                } label: {
+                                    Label("Duplicate", systemImage: "plus.square.on.square")
+                                }
+                                .tint(LifetwineTheme.mint)
                             }
                             .swipeActions(edge: .trailing) {
                                 Button {
@@ -55,10 +89,11 @@ struct TrackersView: View {
                                 .tint(.orange)
                             }
                         }
+                        .onMove(perform: move)
                     } header: {
-                        Text("Your trackers")
+                        Text("Your trackers (\(activeMetrics.count))")
                     } footer: {
-                        Text("Swipe right to add or remove a tracker from Quick log.")
+                        Text("Tap to edit. Swipe right to show on Today or duplicate. Drag while editing to reorder.")
                     }
                 }
 
@@ -81,6 +116,23 @@ struct TrackersView: View {
                         Label("Export all entries", systemImage: "square.and.arrow.up")
                     }
                     .disabled(entries.isEmpty)
+
+                    if sampleEntryCount > 0 {
+                        Label("\(sampleEntryCount) clearly marked sample logs are included so you can explore Patterns.", systemImage: "sparkles")
+                            .font(.subheadline)
+                            .foregroundStyle(LifetwineTheme.indigo)
+                        Button(role: .destructive) {
+                            SampleDataLibrary.remove(in: modelContext)
+                        } label: {
+                            Label("Remove sample history", systemImage: "trash")
+                        }
+                    } else {
+                        Button {
+                            SampleDataLibrary.install(in: modelContext)
+                        } label: {
+                            Label("Add 21 days of sample history", systemImage: "wand.and.stars")
+                        }
+                    }
                 }
 
                 if !archivedMetrics.isEmpty {
@@ -114,7 +166,11 @@ struct TrackersView: View {
             .scrollContentBackground(.hidden)
             .background(LifetwineTheme.canvas)
             .navigationTitle("Trackers")
+            .searchable(text: $searchText, prompt: "Find a tracker")
             .toolbar {
+                ToolbarItem(placement: .topBarLeading) {
+                    EditButton()
+                }
                 ToolbarItem(placement: .primaryAction) {
                     Button {
                         editingMetric = nil
@@ -134,6 +190,43 @@ struct TrackersView: View {
                 defaultFilename: "Lifetwine Export \(Date.now.formatted(.dateTime.year().month().day()))"
             ) { _ in }
         }
+    }
+
+    private func duplicate(_ metric: MetricDefinition) {
+        let copy = MetricDefinition(
+            name: "\(metric.name) copy",
+            kind: metric.kind,
+            unit: metric.unit,
+            symbol: metric.symbol,
+            colorHex: metric.colorHex,
+            minimumValue: metric.minimumValue,
+            maximumValue: metric.maximumValue,
+            stepValue: metric.stepValue,
+            defaultValue: metric.defaultValue,
+            lowLabel: metric.lowLabel,
+            highLabel: metric.highLabel,
+            choices: metric.choices,
+            aggregation: metric.aggregation,
+            role: metric.role,
+            isPinned: metric.isPinned,
+            sortOrder: metrics.count + 1,
+            promptText: metric.promptText ?? "",
+            quickValues: metric.quickValues,
+            positiveLabel: metric.yesLabel,
+            negativeLabel: metric.noLabel,
+            medications: metric.medications
+        )
+        modelContext.insert(copy)
+        try? modelContext.save()
+        editingMetric = copy
+        showingEditor = true
+    }
+
+    private func move(from source: IndexSet, to destination: Int) {
+        var reordered = activeMetrics
+        reordered.move(fromOffsets: source, toOffset: destination)
+        for (index, metric) in reordered.enumerated() { metric.sortOrder = index }
+        try? modelContext.save()
     }
 
     private func trackerRow(_ metric: MetricDefinition) -> some View {
