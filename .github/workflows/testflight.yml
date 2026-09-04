@@ -12,12 +12,18 @@ concurrency:
 
 jobs:
   release:
-    runs-on: macos-15
+    runs-on: macos-26
     timeout-minutes: 45
 
     steps:
       - name: Check out source
         uses: actions/checkout@v7
+
+      - name: Verify Apple toolchain
+        run: |
+          set -euo pipefail
+          xcodebuild -version
+          echo "iPhoneOS SDK $(xcrun --sdk iphoneos --show-sdk-version)"
 
       - name: Import Apple distribution certificate
         uses: Apple-Actions/import-codesign-certs@v7
