@@ -283,7 +283,7 @@ enum CorrelationEngine {
             } else if metric.kind == .choice, !metric.choices.isEmpty {
                 for (index, choice) in metric.choices.enumerated() {
                     let selectedValue = Double(index + 1)
-                    let binaryValues = values.mapValues { abs($0 - selectedValue) < 0.001 ? 1 : 0 }
+                    let binaryValues = values.mapValues { abs($0 - selectedValue) < 0.001 ? 1.0 : 0.0 }
                     result.append(Series(
                         identity: "\(metric.id.uuidString):\(index)",
                         metricID: metric.id,
