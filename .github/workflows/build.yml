@@ -15,7 +15,7 @@ jobs:
 
     steps:
       - name: Check out source
-        uses: actions/checkout@v4
+        uses: actions/checkout@v7
 
       - name: Show Apple toolchain
         run: xcodebuild -version
@@ -59,7 +59,7 @@ jobs:
           ditto -c -k --sequesterRsrc --keepParent "$RUNNER_TEMP/Payload" "$GITHUB_WORKSPACE/Lifetwine-unsigned.ipa"
 
       - name: Upload build artifact
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v7
         with:
           name: Lifetwine-unsigned-IPA
           path: Lifetwine-unsigned.ipa

@@ -1,0 +1,68 @@
+name: Release to TestFlight
+
+on:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: lifetwine-testflight
+  cancel-in-progress: false
+
+jobs:
+  release:
+    runs-on: macos-15
+    timeout-minutes: 45
+
+    steps:
+      - name: Check out source
+        uses: actions/checkout@v7
+
+      - name: Import Apple distribution certificate
+        uses: Apple-Actions/import-codesign-certs@v7
+        with:
+          p12-file-base64: ${{ secrets.BUILD_CERTIFICATE_BASE64 }}
+          p12-password: ${{ secrets.P12_PASSWORD }}
+
+      - name: Download App Store provisioning profile
+        uses: Apple-Actions/download-provisioning-profiles@v6
+        with:
+          bundle-id: com.krabople.lifetwine
+          profile-type: IOS_APP_STORE
+          issuer-id: ${{ secrets.APPSTORE_ISSUER_ID }}
+          api-key-id: ${{ secrets.APPSTORE_KEY_ID }}
+          api-private-key: ${{ secrets.APPSTORE_PRIVATE_KEY }}
+
+      - name: Archive and export signed IPA
+        id: build
+        uses: Apple-Actions/xcodebuild@v1
+        with:
+          project: Lifetwine.xcodeproj
+          scheme: Lifetwine
+          configuration: Release
+          sdk: iphoneos
+          destination: generic/platform=iOS
+          action: archive
+          archive-path: .build/Archives/Lifetwine.xcarchive
+          export-options-plist: Support/ExportOptions.plist
+          export-path: .build/Export
+          build-number: ${{ github.run_number }}
+
+      - name: Upload signed IPA artifact
+        uses: actions/upload-artifact@v7
+        with:
+          name: Lifetwine-signed-IPA
+          path: ${{ steps.build.outputs.ipa-path }}
+          if-no-files-found: error
+
+      - name: Upload to TestFlight
+        uses: Apple-Actions/upload-testflight-build@v5
+        with:
+          app-path: ${{ steps.build.outputs.ipa-path }}
+          issuer-id: ${{ secrets.APPSTORE_ISSUER_ID }}
+          api-key-id: ${{ secrets.APPSTORE_KEY_ID }}
+          api-private-key: ${{ secrets.APPSTORE_PRIVATE_KEY }}
+          uses-non-exempt-encryption: "false"
+          wait-for-processing: "true"
+

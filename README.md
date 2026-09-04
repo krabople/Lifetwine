@@ -30,11 +30,15 @@ Lifetwine is a private, native iPhone app for logging anything in seconds and di
 3. Select the `Lifetwine` scheme and an iPhone simulator running iOS 17 or later.
 4. Press Run.
 
-For a physical iPhone, select your Apple development team under **Signing & Capabilities** and choose a unique bundle identifier if Xcode asks for one.
+The project is configured for Apple team `6YYA8L76Y8` with bundle identifier `com.krabople.lifetwine`.
 
 ## Tests
 
 In Xcode, choose **Product → Test**. The included test target exercises the statistical engine without needing network access.
+
+## TestFlight
+
+The manual **Release to TestFlight** GitHub workflow creates a signed App Store IPA, preserves it as a private build artifact, uploads it to TestFlight, and waits for Apple to finish processing it. Apple signing credentials are held only as encrypted repository secrets.
 
 ## Privacy and health note
 
