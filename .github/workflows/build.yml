@@ -1,0 +1,67 @@
+name: Build iPhone app
+
+on:
+  push:
+    branches: [main]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  build:
+    runs-on: macos-15
+    timeout-minutes: 30
+
+    steps:
+      - name: Check out source
+        uses: actions/checkout@v4
+
+      - name: Show Apple toolchain
+        run: xcodebuild -version
+
+      - name: Build for iPhone Simulator
+        run: |
+          set -euo pipefail
+          xcodebuild clean build \
+            -project Lifetwine.xcodeproj \
+            -scheme Lifetwine \
+            -configuration Debug \
+            -destination 'generic/platform=iOS Simulator' \
+            CODE_SIGNING_ALLOWED=NO
+
+      - name: Run unit tests
+        run: |
+          set -euo pipefail
+          DEVICE_UDID="$(xcrun simctl list devices available -j | jq -r '[.devices[][] | select(.name | startswith("iPhone"))][0].udid')"
+          test -n "$DEVICE_UDID"
+          xcodebuild test \
+            -project Lifetwine.xcodeproj \
+            -scheme Lifetwine \
+            -configuration Debug \
+            -destination "platform=iOS Simulator,id=$DEVICE_UDID" \
+            CODE_SIGNING_ALLOWED=NO
+
+      - name: Package unsigned device build
+        run: |
+          set -euo pipefail
+          BUILD_DIR="$RUNNER_TEMP/Lifetwine-device"
+          xcodebuild clean build \
+            -project Lifetwine.xcodeproj \
+            -scheme Lifetwine \
+            -configuration Release \
+            -destination 'generic/platform=iOS' \
+            CONFIGURATION_BUILD_DIR="$BUILD_DIR" \
+            CODE_SIGNING_ALLOWED=NO \
+            CODE_SIGNING_REQUIRED=NO
+          mkdir -p "$RUNNER_TEMP/Payload"
+          cp -R "$BUILD_DIR/Lifetwine.app" "$RUNNER_TEMP/Payload/"
+          ditto -c -k --sequesterRsrc --keepParent "$RUNNER_TEMP/Payload" "$GITHUB_WORKSPACE/Lifetwine-unsigned.ipa"
+
+      - name: Upload build artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: Lifetwine-unsigned-IPA
+          path: Lifetwine-unsigned.ipa
+          if-no-files-found: error
+

@@ -1,0 +1,166 @@
+// !$*UTF8*$!
+{
+	archiveVersion = 1;
+	classes = {};
+	objectVersion = 56;
+	objects = {
+
+/* Begin PBXBuildFile section */
+		A00000000000000000000001 /* LifetwineApp.swift in Sources */ = {isa = PBXBuildFile; fileRef = C00000000000000000000001 /* LifetwineApp.swift */; };
+		A00000000000000000000002 /* MetricDefinition.swift in Sources */ = {isa = PBXBuildFile; fileRef = C00000000000000000000002 /* MetricDefinition.swift */; };
+		A00000000000000000000003 /* MetricEntry.swift in Sources */ = {isa = PBXBuildFile; fileRef = C00000000000000000000003 /* MetricEntry.swift */; };
+		A00000000000000000000004 /* Theme.swift in Sources */ = {isa = PBXBuildFile; fileRef = C00000000000000000000004 /* Theme.swift */; };
+		A00000000000000000000005 /* StarterLibrary.swift in Sources */ = {isa = PBXBuildFile; fileRef = C00000000000000000000005 /* StarterLibrary.swift */; };
+		A00000000000000000000006 /* CorrelationEngine.swift in Sources */ = {isa = PBXBuildFile; fileRef = C00000000000000000000006 /* CorrelationEngine.swift */; };
+		A00000000000000000000007 /* CSVExportDocument.swift in Sources */ = {isa = PBXBuildFile; fileRef = C00000000000000000000007 /* CSVExportDocument.swift */; };
+		A00000000000000000000008 /* RootView.swift in Sources */ = {isa = PBXBuildFile; fileRef = C00000000000000000000008 /* RootView.swift */; };
+		A00000000000000000000009 /* TodayView.swift in Sources */ = {isa = PBXBuildFile; fileRef = C00000000000000000000009 /* TodayView.swift */; };
+		A0000000000000000000000A /* QuickLogCard.swift in Sources */ = {isa = PBXBuildFile; fileRef = C0000000000000000000000A /* QuickLogCard.swift */; };
+		A0000000000000000000000B /* EntryRow.swift in Sources */ = {isa = PBXBuildFile; fileRef = C0000000000000000000000B /* EntryRow.swift */; };
+		A0000000000000000000000C /* HistoryView.swift in Sources */ = {isa = PBXBuildFile; fileRef = C0000000000000000000000C /* HistoryView.swift */; };
+		A0000000000000000000000D /* InsightsView.swift in Sources */ = {isa = PBXBuildFile; fileRef = C0000000000000000000000D /* InsightsView.swift */; };
+		A0000000000000000000000E /* TrackersView.swift in Sources */ = {isa = PBXBuildFile; fileRef = C0000000000000000000000E /* TrackersView.swift */; };
+		A0000000000000000000000F /* MetricEditorView.swift in Sources */ = {isa = PBXBuildFile; fileRef = C0000000000000000000000F /* MetricEditorView.swift */; };
+		A00000000000000000000010 /* Assets.xcassets in Resources */ = {isa = PBXBuildFile; fileRef = C00000000000000000000010 /* Assets.xcassets */; };
+		A00000000000000000000011 /* CorrelationEngineTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = C00000000000000000000012 /* CorrelationEngineTests.swift */; };
+/* End PBXBuildFile section */
+
+/* Begin PBXContainerItemProxy section */
+		J00000000000000000000001 /* PBXContainerItemProxy */ = {
+			isa = PBXContainerItemProxy;
+			containerPortal = H00000000000000000000001 /* Project object */;
+			proxyType = 1;
+			remoteGlobalIDString = F00000000000000000000001;
+			remoteInfo = Lifetwine;
+		};
+/* End PBXContainerItemProxy section */
+
+/* Begin PBXFileReference section */
+		C00000000000000000000001 /* LifetwineApp.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = LifetwineApp.swift; sourceTree = "<group>"; };
+		C00000000000000000000002 /* MetricDefinition.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MetricDefinition.swift; sourceTree = "<group>"; };
+		C00000000000000000000003 /* MetricEntry.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MetricEntry.swift; sourceTree = "<group>"; };
+		C00000000000000000000004 /* Theme.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Theme.swift; sourceTree = "<group>"; };
+		C00000000000000000000005 /* StarterLibrary.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = StarterLibrary.swift; sourceTree = "<group>"; };
+		C00000000000000000000006 /* CorrelationEngine.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CorrelationEngine.swift; sourceTree = "<group>"; };
+		C00000000000000000000007 /* CSVExportDocument.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CSVExportDocument.swift; sourceTree = "<group>"; };
+		C00000000000000000000008 /* RootView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = RootView.swift; sourceTree = "<group>"; };
+		C00000000000000000000009 /* TodayView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TodayView.swift; sourceTree = "<group>"; };
+		C0000000000000000000000A /* QuickLogCard.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = QuickLogCard.swift; sourceTree = "<group>"; };
+		C0000000000000000000000B /* EntryRow.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = EntryRow.swift; sourceTree = "<group>"; };
+		C0000000000000000000000C /* HistoryView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = HistoryView.swift; sourceTree = "<group>"; };
+		C0000000000000000000000D /* InsightsView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = InsightsView.swift; sourceTree = "<group>"; };
+		C0000000000000000000000E /* TrackersView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TrackersView.swift; sourceTree = "<group>"; };
+		C0000000000000000000000F /* MetricEditorView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MetricEditorView.swift; sourceTree = "<group>"; };
+		C00000000000000000000010 /* Assets.xcassets */ = {isa = PBXFileReference; lastKnownFileType = folder.assetcatalog; path = Assets.xcassets; sourceTree = "<group>"; };
+		C00000000000000000000011 /* Info.plist */ = {isa = PBXFileReference; lastKnownFileType = text.plist.xml; path = Info.plist; sourceTree = "<group>"; };
+		C00000000000000000000012 /* CorrelationEngineTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CorrelationEngineTests.swift; sourceTree = "<group>"; };
+		C00000000000000000000013 /* Lifetwine.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = Lifetwine.app; sourceTree = BUILT_PRODUCTS_DIR; };
+		C00000000000000000000014 /* LifetwineTests.xctest */ = {isa = PBXFileReference; explicitFileType = wrapper.cfbundle; includeInIndex = 0; path = LifetwineTests.xctest; sourceTree = BUILT_PRODUCTS_DIR; };
+/* End PBXFileReference section */
+
+/* Begin PBXFrameworksBuildPhase section */
+		E00000000000000000000001 /* Frameworks */ = {isa = PBXFrameworksBuildPhase; buildActionMask = 2147483647; files = (); runOnlyForDeploymentPostprocessing = 0; };
+		E00000000000000000000004 /* Frameworks */ = {isa = PBXFrameworksBuildPhase; buildActionMask = 2147483647; files = (); runOnlyForDeploymentPostprocessing = 0; };
+/* End PBXFrameworksBuildPhase section */
+
+/* Begin PBXGroup section */
+		D00000000000000000000000 = {
+			isa = PBXGroup;
+			children = (D00000000000000000000001 /* Lifetwine */, D00000000000000000000002 /* LifetwineTests */, D00000000000000000000003 /* Products */);
+			sourceTree = "<group>";
+		};
+		D00000000000000000000001 /* Lifetwine */ = {
+			isa = PBXGroup;
+			children = (C00000000000000000000001 /* LifetwineApp.swift */, C00000000000000000000004 /* Theme.swift */, D00000000000000000000004 /* Models */, D00000000000000000000005 /* Services */, D00000000000000000000006 /* Views */, C00000000000000000000010 /* Assets.xcassets */, C00000000000000000000011 /* Info.plist */);
+			path = Lifetwine;
+			sourceTree = "<group>";
+		};
+		D00000000000000000000002 /* LifetwineTests */ = {isa = PBXGroup; children = (C00000000000000000000012 /* CorrelationEngineTests.swift */); path = LifetwineTests; sourceTree = "<group>"; };
+		D00000000000000000000003 /* Products */ = {isa = PBXGroup; children = (C00000000000000000000013 /* Lifetwine.app */, C00000000000000000000014 /* LifetwineTests.xctest */); name = Products; sourceTree = "<group>"; };
+		D00000000000000000000004 /* Models */ = {isa = PBXGroup; children = (C00000000000000000000002 /* MetricDefinition.swift */, C00000000000000000000003 /* MetricEntry.swift */); path = Models; sourceTree = "<group>"; };
+		D00000000000000000000005 /* Services */ = {isa = PBXGroup; children = (C00000000000000000000005 /* StarterLibrary.swift */, C00000000000000000000006 /* CorrelationEngine.swift */, C00000000000000000000007 /* CSVExportDocument.swift */); path = Services; sourceTree = "<group>"; };
+		D00000000000000000000006 /* Views */ = {isa = PBXGroup; children = (C00000000000000000000008 /* RootView.swift */, C00000000000000000000009 /* TodayView.swift */, C0000000000000000000000A /* QuickLogCard.swift */, C0000000000000000000000B /* EntryRow.swift */, C0000000000000000000000C /* HistoryView.swift */, C0000000000000000000000D /* InsightsView.swift */, C0000000000000000000000E /* TrackersView.swift */, C0000000000000000000000F /* MetricEditorView.swift */); path = Views; sourceTree = "<group>"; };
+/* End PBXGroup section */
+
+/* Begin PBXNativeTarget section */
+		F00000000000000000000001 /* Lifetwine */ = {
+			isa = PBXNativeTarget;
+			buildConfigurationList = K00000000000000000000002 /* Build configuration list for PBXNativeTarget "Lifetwine" */;
+			buildPhases = (E00000000000000000000002 /* Sources */, E00000000000000000000001 /* Frameworks */, E00000000000000000000003 /* Resources */);
+			buildRules = ();
+			dependencies = ();
+			name = Lifetwine;
+			productName = Lifetwine;
+			productReference = C00000000000000000000013 /* Lifetwine.app */;
+			productType = "com.apple.product-type.application";
+		};
+		F00000000000000000000002 /* LifetwineTests */ = {
+			isa = PBXNativeTarget;
+			buildConfigurationList = K00000000000000000000003 /* Build configuration list for PBXNativeTarget "LifetwineTests" */;
+			buildPhases = (E00000000000000000000005 /* Sources */, E00000000000000000000004 /* Frameworks */, E00000000000000000000006 /* Resources */);
+			buildRules = ();
+			dependencies = (I00000000000000000000001 /* PBXTargetDependency */);
+			name = LifetwineTests;
+			productName = LifetwineTests;
+			productReference = C00000000000000000000014 /* LifetwineTests.xctest */;
+			productType = "com.apple.product-type.bundle.unit-test";
+		};
+/* End PBXNativeTarget section */
+
+/* Begin PBXProject section */
+		H00000000000000000000001 /* Project object */ = {
+			isa = PBXProject;
+			attributes = {
+				BuildIndependentTargetsInParallel = 1;
+				LastSwiftUpdateCheck = 1600;
+				LastUpgradeCheck = 1600;
+				TargetAttributes = {
+					F00000000000000000000001 = {CreatedOnToolsVersion = 16.0; };
+					F00000000000000000000002 = {CreatedOnToolsVersion = 16.0; TestTargetID = F00000000000000000000001; };
+				};
+			};
+			buildConfigurationList = K00000000000000000000001 /* Build configuration list for PBXProject "Lifetwine" */;
+			compatibilityVersion = "Xcode 14.0";
+			developmentRegion = en;
+			hasScannedForEncodings = 0;
+			knownRegions = (en, Base);
+			mainGroup = D00000000000000000000000;
+			productRefGroup = D00000000000000000000003 /* Products */;
+			projectDirPath = "";
+			projectRoot = "";
+			targets = (F00000000000000000000001 /* Lifetwine */, F00000000000000000000002 /* LifetwineTests */);
+		};
+/* End PBXProject section */
+
+/* Begin PBXResourcesBuildPhase section */
+		E00000000000000000000003 /* Resources */ = {isa = PBXResourcesBuildPhase; buildActionMask = 2147483647; files = (A00000000000000000000010 /* Assets.xcassets in Resources */); runOnlyForDeploymentPostprocessing = 0; };
+		E00000000000000000000006 /* Resources */ = {isa = PBXResourcesBuildPhase; buildActionMask = 2147483647; files = (); runOnlyForDeploymentPostprocessing = 0; };
+/* End PBXResourcesBuildPhase section */
+
+/* Begin PBXSourcesBuildPhase section */
+		E00000000000000000000002 /* Sources */ = {isa = PBXSourcesBuildPhase; buildActionMask = 2147483647; files = (A00000000000000000000001, A00000000000000000000002, A00000000000000000000003, A00000000000000000000004, A00000000000000000000005, A00000000000000000000006, A00000000000000000000007, A00000000000000000000008, A00000000000000000000009, A0000000000000000000000A, A0000000000000000000000B, A0000000000000000000000C, A0000000000000000000000D, A0000000000000000000000E, A0000000000000000000000F); runOnlyForDeploymentPostprocessing = 0; };
+		E00000000000000000000005 /* Sources */ = {isa = PBXSourcesBuildPhase; buildActionMask = 2147483647; files = (A00000000000000000000011 /* CorrelationEngineTests.swift in Sources */); runOnlyForDeploymentPostprocessing = 0; };
+/* End PBXSourcesBuildPhase section */
+
+/* Begin PBXTargetDependency section */
+		I00000000000000000000001 /* PBXTargetDependency */ = {isa = PBXTargetDependency; target = F00000000000000000000001 /* Lifetwine */; targetProxy = J00000000000000000000001 /* PBXContainerItemProxy */; };
+/* End PBXTargetDependency section */
+
+/* Begin XCBuildConfiguration section */
+		G00000000000000000000001 /* Debug */ = {isa = XCBuildConfiguration; buildSettings = {ALWAYS_SEARCH_USER_PATHS = NO; CLANG_ENABLE_MODULES = YES; CLANG_ENABLE_OBJC_ARC = YES; DEBUG_INFORMATION_FORMAT = dwarf; ENABLE_TESTABILITY = YES; GCC_C_LANGUAGE_STANDARD = gnu17; GCC_OPTIMIZATION_LEVEL = 0; IPHONEOS_DEPLOYMENT_TARGET = 17.0; ONLY_ACTIVE_ARCH = YES; SDKROOT = iphoneos; SWIFT_ACTIVE_COMPILATION_CONDITIONS = "DEBUG $(inherited)"; SWIFT_OPTIMIZATION_LEVEL = "-Onone"; }; name = Debug; };
+		G00000000000000000000002 /* Release */ = {isa = XCBuildConfiguration; buildSettings = {ALWAYS_SEARCH_USER_PATHS = NO; CLANG_ENABLE_MODULES = YES; CLANG_ENABLE_OBJC_ARC = YES; DEBUG_INFORMATION_FORMAT = "dwarf-with-dsym"; GCC_C_LANGUAGE_STANDARD = gnu17; IPHONEOS_DEPLOYMENT_TARGET = 17.0; SDKROOT = iphoneos; SWIFT_COMPILATION_MODE = wholemodule; SWIFT_OPTIMIZATION_LEVEL = "-O"; VALIDATE_PRODUCT = YES; }; name = Release; };
+		G00000000000000000000003 /* Debug */ = {isa = XCBuildConfiguration; buildSettings = {ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon; ASSETCATALOG_COMPILER_GLOBAL_ACCENT_COLOR_NAME = AccentColor; CODE_SIGN_STYLE = Automatic; CURRENT_PROJECT_VERSION = 1; GENERATE_INFOPLIST_FILE = NO; INFOPLIST_FILE = Lifetwine/Info.plist; MARKETING_VERSION = 1.0; PRODUCT_BUNDLE_IDENTIFIER = com.lifetwine.app; PRODUCT_NAME = "$(TARGET_NAME)"; SUPPORTED_PLATFORMS = "iphoneos iphonesimulator"; SUPPORTS_MACCATALYST = NO; SWIFT_EMIT_LOC_STRINGS = YES; SWIFT_VERSION = 5.0; TARGETED_DEVICE_FAMILY = 1; }; name = Debug; };
+		G00000000000000000000004 /* Release */ = {isa = XCBuildConfiguration; buildSettings = {ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon; ASSETCATALOG_COMPILER_GLOBAL_ACCENT_COLOR_NAME = AccentColor; CODE_SIGN_STYLE = Automatic; CURRENT_PROJECT_VERSION = 1; GENERATE_INFOPLIST_FILE = NO; INFOPLIST_FILE = Lifetwine/Info.plist; MARKETING_VERSION = 1.0; PRODUCT_BUNDLE_IDENTIFIER = com.lifetwine.app; PRODUCT_NAME = "$(TARGET_NAME)"; SUPPORTED_PLATFORMS = "iphoneos iphonesimulator"; SUPPORTS_MACCATALYST = NO; SWIFT_EMIT_LOC_STRINGS = YES; SWIFT_VERSION = 5.0; TARGETED_DEVICE_FAMILY = 1; }; name = Release; };
+		G00000000000000000000005 /* Debug */ = {isa = XCBuildConfiguration; buildSettings = {BUNDLE_LOADER = "$(TEST_HOST)"; CODE_SIGN_STYLE = Automatic; GENERATE_INFOPLIST_FILE = YES; IPHONEOS_DEPLOYMENT_TARGET = 17.0; PRODUCT_BUNDLE_IDENTIFIER = com.lifetwine.app.tests; PRODUCT_NAME = "$(TARGET_NAME)"; SWIFT_VERSION = 5.0; TARGETED_DEVICE_FAMILY = 1; TEST_HOST = "$(BUILT_PRODUCTS_DIR)/Lifetwine.app/$(BUNDLE_EXECUTABLE_FOLDER_PATH)/Lifetwine"; }; name = Debug; };
+		G00000000000000000000006 /* Release */ = {isa = XCBuildConfiguration; buildSettings = {BUNDLE_LOADER = "$(TEST_HOST)"; CODE_SIGN_STYLE = Automatic; GENERATE_INFOPLIST_FILE = YES; IPHONEOS_DEPLOYMENT_TARGET = 17.0; PRODUCT_BUNDLE_IDENTIFIER = com.lifetwine.app.tests; PRODUCT_NAME = "$(TARGET_NAME)"; SWIFT_VERSION = 5.0; TARGETED_DEVICE_FAMILY = 1; TEST_HOST = "$(BUILT_PRODUCTS_DIR)/Lifetwine.app/$(BUNDLE_EXECUTABLE_FOLDER_PATH)/Lifetwine"; }; name = Release; };
+/* End XCBuildConfiguration section */
+
+/* Begin XCConfigurationList section */
+		K00000000000000000000001 /* Build configuration list for PBXProject "Lifetwine" */ = {isa = XCConfigurationList; buildConfigurations = (G00000000000000000000001 /* Debug */, G00000000000000000000002 /* Release */); defaultConfigurationIsVisible = 0; defaultConfigurationName = Release; };
+		K00000000000000000000002 /* Build configuration list for PBXNativeTarget "Lifetwine" */ = {isa = XCConfigurationList; buildConfigurations = (G00000000000000000000003 /* Debug */, G00000000000000000000004 /* Release */); defaultConfigurationIsVisible = 0; defaultConfigurationName = Release; };
+		K00000000000000000000003 /* Build configuration list for PBXNativeTarget "LifetwineTests" */ = {isa = XCConfigurationList; buildConfigurations = (G00000000000000000000005 /* Debug */, G00000000000000000000006 /* Release */); defaultConfigurationIsVisible = 0; defaultConfigurationName = Release; };
+/* End XCConfigurationList section */
+	};
+	rootObject = H00000000000000000000001 /* Project object */;
+}
+
