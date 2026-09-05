@@ -7,9 +7,9 @@
 	<key>provisioningProfiles</key>
 	<dict>
 		<key>com.krabople.lifetwine</key>
-		<string>AppStore Lifetwine GitHub</string>
+		<string>AppStore Lifetwine Shared GitHub</string>
 		<key>com.krabople.lifetwine.widget</key>
-		<string>AppStore Lifetwine Widget GitHub</string>
+		<string>AppStore Lifetwine Widget Shared GitHub</string>
 	</dict>
 	<key>signingStyle</key>
 	<string>manual</string>
@@ -17,4 +17,3 @@
 	<string>6YYA8L76Y8</string>
 </dict>
 </plist>
-

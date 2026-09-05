@@ -228,7 +228,7 @@ struct ChartExplorerView: View {
         guard !choseDefaults else { return }
         choseDefaults = true
         let metricsWithData = metrics.filter { metric in
-            !$0.isArchived && metric.supportsCorrelation && entries.contains { $0.metric?.id == metric.id }
+            !metric.isArchived && metric.supportsCorrelation && entries.contains { $0.metric?.id == metric.id }
         }
         let preferred = metricsWithData.filter(\.isPinned)
         selectedIDs = Set((preferred.isEmpty ? metricsWithData : preferred).prefix(3).map(\.id))
