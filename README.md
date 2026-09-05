@@ -12,7 +12,7 @@ Lifetwine is a private, native iPhone app for logging anything in seconds and di
 - A searchable universal logger plus a fully customisable and reorderable Today screen
 - Backdated logging with shortcuts for now, an hour ago, earlier today, yesterday, or any previous date
 - A clean chronological journal with search, edit, repeat, and delete actions
-- Siri and Shortcuts support, an app-icon Quick Log action, and `lifetwine://log` deep linking
+- Home Screen and Lock Screen Quick Log widgets, Siri and Shortcuts support, an app-icon Quick Log action, and `lifetwine://log` deep linking
 - A correlation engine that:
   - compares influences with outcomes
   - tests same-day, one-day, and two-day delays
