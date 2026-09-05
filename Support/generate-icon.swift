@@ -2,11 +2,31 @@ import AppKit
 
 let output = CommandLine.arguments.dropFirst().first
     ?? "Morrow/Resources/Assets.xcassets/AppIcon.appiconset/MorrowIcon-1024.png"
-let size = NSSize(width: 1024, height: 1024)
-let image = NSImage(size: size)
+let width = 1024
+let height = 1024
 
-image.lockFocus()
-NSGraphicsContext.current?.imageInterpolation = .high
+guard let bitmap = NSBitmapImageRep(
+    bitmapDataPlanes: nil,
+    pixelsWide: width,
+    pixelsHigh: height,
+    bitsPerSample: 8,
+    samplesPerPixel: 3,
+    hasAlpha: false,
+    isPlanar: false,
+    colorSpaceName: .sRGB,
+    bytesPerRow: 0,
+    bitsPerPixel: 0
+) else {
+    fatalError("Failed to create NSBitmapImageRep")
+}
+
+NSGraphicsContext.saveGraphicsState()
+guard let context = NSGraphicsContext(bitmapImageRep: bitmap) else {
+    fatalError("Failed to create NSGraphicsContext")
+}
+NSGraphicsContext.current = context
+
+let size = NSSize(width: width, height: height)
 
 NSColor(srgbRed: 0.075, green: 0.165, blue: 0.137, alpha: 1).setFill()
 NSBezierPath(rect: NSRect(origin: .zero, size: size)).fill()
@@ -42,13 +62,9 @@ check.lineJoinStyle = .round
 sunColor.setStroke()
 check.stroke()
 
-image.unlockFocus()
+NSGraphicsContext.restoreGraphicsState()
 
-guard
-    let tiff = image.tiffRepresentation,
-    let bitmap = NSBitmapImageRep(data: tiff),
-    let data = bitmap.representation(using: .png, properties: [:])
-else {
+guard let data = bitmap.representation(using: .png, properties: [:]) else {
     fatalError("Unable to render Morrow app icon")
 }
 
