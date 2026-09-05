@@ -7,6 +7,7 @@ on:
 
 permissions:
   contents: read
+  statuses: write
 
 jobs:
   build:
@@ -68,3 +69,17 @@ jobs:
           path: Lifetwine-unsigned.ipa
           if-no-files-found: error
 
+      - name: Publish Xcode build result
+        if: ${{ always() }}
+        env:
+          GH_TOKEN: ${{ github.token }}
+          JOB_RESULT: ${{ job.status }}
+        run: |
+          set -euo pipefail
+          STATE="$JOB_RESULT"
+          if [ "$STATE" = "cancelled" ]; then STATE="error"; fi
+          gh api --method POST "repos/${{ github.repository }}/statuses/${{ github.sha }}" \
+            -f state="$STATE" \
+            -f context="Lifetwine / Xcode 26" \
+            -f description="Simulator build, tests and iPhone package: $JOB_RESULT" \
+            -f target_url="${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}"

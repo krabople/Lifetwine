@@ -43,7 +43,7 @@ enum StarterLibrary {
             MetricDefinition(
                 name: "Meditation", kind: .duration, unit: "minutes", symbol: "brain.head.profile", colorHex: "7C63C8",
                 minimumValue: 0, maximumValue: 300, stepValue: 5, defaultValue: 10,
-                aggregation: .total, role: .influence, sortOrder: 6
+                aggregation: .total, role: .influence, sortOrder: 6, quickValues: [5, 10, 15, 20]
             ),
             MetricDefinition(
                 name: "Stress", kind: .scale, symbol: "waveform.path.ecg", colorHex: "EA796B",
@@ -88,9 +88,13 @@ enum StarterLibrary {
                 name: "Meditation", kind: .duration, unit: "minutes", symbol: "brain.head.profile", colorHex: "7C63C8",
                 minimumValue: 0, maximumValue: 300, stepValue: 5, defaultValue: 10,
                 aggregation: .total, role: .influence, isPinned: true,
-                sortOrder: (metrics.map(\.sortOrder).max() ?? -1) + 1
+                sortOrder: (metrics.map(\.sortOrder).max() ?? -1) + 1,
+                quickValues: [5, 10, 15, 20]
             )
             context.insert(meditation)
+        }
+        if let meditation = metrics.first(where: { $0.name.caseInsensitiveCompare("Meditation") == .orderedSame && $0.quickValues.isEmpty }) {
+            meditation.quickValues = [5, 10, 15, 20]
         }
         try? context.save()
     }
