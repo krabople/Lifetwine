@@ -2,31 +2,11 @@ import AppKit
 
 let output = CommandLine.arguments.dropFirst().first
     ?? "Morrow/Resources/Assets.xcassets/AppIcon.appiconset/MorrowIcon-1024.png"
-let width = 1024
-let height = 1024
+let size = NSSize(width: 1024, height: 1024)
+let image = NSImage(size: size)
 
-guard let bitmap = NSBitmapImageRep(
-    bitmapDataPlanes: nil,
-    pixelsWide: width,
-    pixelsHigh: height,
-    bitsPerSample: 8,
-    samplesPerPixel: 3,
-    hasAlpha: false,
-    isPlanar: false,
-    colorSpaceName: .sRGB,
-    bytesPerRow: 0,
-    bitsPerPixel: 0
-) else {
-    fatalError("Failed to create NSBitmapImageRep")
-}
-
-NSGraphicsContext.saveGraphicsState()
-guard let context = NSGraphicsContext(bitmapImageRep: bitmap) else {
-    fatalError("Failed to create NSGraphicsContext")
-}
-NSGraphicsContext.current = context
-
-let size = NSSize(width: width, height: height)
+image.lockFocus()
+NSGraphicsContext.current?.imageInterpolation = .high
 
 NSColor(srgbRed: 0.075, green: 0.165, blue: 0.137, alpha: 1).setFill()
 NSBezierPath(rect: NSRect(origin: .zero, size: size)).fill()
@@ -62,13 +42,39 @@ check.lineJoinStyle = .round
 sunColor.setStroke()
 check.stroke()
 
-NSGraphicsContext.restoreGraphicsState()
+image.unlockFocus()
 
-guard let data = bitmap.representation(using: .png, properties: [:]) else {
+guard
+    let tiff = image.tiffRepresentation,
+    let bitmap = NSBitmapImageRep(data: tiff),
+    let cgImage = bitmap.cgImage
+else {
     fatalError("Unable to render Morrow app icon")
+}
+
+let colorSpace = CGColorSpaceCreateDeviceRGB()
+guard let cgContext = CGContext(
+    data: nil,
+    width: 1024,
+    height: 1024,
+    bitsPerComponent: 8,
+    bytesPerRow: 1024 * 4,
+    space: colorSpace,
+    bitmapInfo: CGImageAlphaInfo.noneSkipLast.rawValue
+) else {
+    fatalError("Unable to create opaque CGContext")
+}
+
+cgContext.draw(cgImage, in: CGRect(x: 0, y: 0, width: 1024, height: 1024))
+
+guard
+    let opaqueCgImage = cgContext.makeImage(),
+    let data = NSBitmapImageRep(cgImage: opaqueCgImage).representation(using: NSBitmapImageRep.FileType.png, properties: [:])
+else {
+    fatalError("Unable to generate opaque PNG data")
 }
 
 let outputURL = URL(fileURLWithPath: output)
 try FileManager.default.createDirectory(at: outputURL.deletingLastPathComponent(), withIntermediateDirectories: true)
-try data.write(to: outputURL, options: .atomic)
-print("Generated \(outputURL.path)")
+try data.write(to: outputURL, options: Data.WritingOptions.atomic)
+print("Generated opaque icon at \(outputURL.path)")
