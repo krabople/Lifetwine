@@ -59,7 +59,7 @@ jobs:
           p12-file-base64: ${{ secrets.BUILD_CERTIFICATE_BASE64 }}
           p12-password: ${{ secrets.P12_PASSWORD }}
 
-      - name: Create or download App Store provisioning profile
+      - name: Install App Store provisioning profile
         env:
           APPSTORE_ISSUER_ID: ${{ secrets.APPSTORE_ISSUER_ID }}
           APPSTORE_KEY_ID: ${{ secrets.APPSTORE_KEY_ID }}
@@ -73,128 +73,49 @@ jobs:
           require "openssl"
           require "uri"
 
-          def base64url(value)
-            Base64.urlsafe_encode64(value).delete("=")
-          end
-
-          def fixed_width_integer(value)
-            [value.to_i.to_s(16).rjust(64, "0")].pack("H*")
-          end
+          def base64url(v) = Base64.urlsafe_encode64(v).delete("=")
+          def fixed_width(v) = [v.to_i.to_s(16).rjust(64,"0")].pack("H*")
 
           now = Time.now.to_i
-          header = base64url({ alg: "ES256", kid: ENV.fetch("APPSTORE_KEY_ID"), typ: "JWT" }.to_json)
-          payload = base64url({ iss: ENV.fetch("APPSTORE_ISSUER_ID"), iat: now, exp: now + 900, aud: "appstoreconnect-v1" }.to_json)
-          unsigned_token = "#{header}.#{payload}"
+          h = base64url({alg:"ES256",kid:ENV["APPSTORE_KEY_ID"],typ:"JWT"}.to_json)
+          p = base64url({iss:ENV["APPSTORE_ISSUER_ID"],iat:now,exp:now+900,aud:"appstoreconnect-v1"}.to_json)
+          ut = "#{h}.#{p}"
+          key = OpenSSL::PKey.read(ENV["APPSTORE_PRIVATE_KEY"])
+          sig = key.dsa_sign_asn1(OpenSSL::Digest::SHA256.digest(ut))
+          parts = OpenSSL::ASN1.decode(sig).value
+          token = "#{ut}.#{base64url(parts.map{|x|fixed_width(x.value)}.join)}"
 
-          key = OpenSSL::PKey.read(ENV.fetch("APPSTORE_PRIVATE_KEY"))
-          digest = OpenSSL::Digest::SHA256.digest(unsigned_token)
-          der_signature = key.dsa_sign_asn1(digest)
-          signature_parts = OpenSSL::ASN1.decode(der_signature).value
-          signature = base64url(signature_parts.map { |part| fixed_width_integer(part.value) }.join)
-          token = "#{unsigned_token}.#{signature}"
+          uri = URI("https://api.appstoreconnect.apple.com/v1/profiles?filter[profileType]=IOS_APP_STORE&include=bundleId&fields[profiles]=name,uuid,profileContent,profileState")
+          req = Net::HTTP::Get.new(uri)
+          req["Authorization"] = "Bearer #{token}"
+          resp = Net::HTTP.start(uri.hostname, uri.port, use_ssl: true){|h|h.request(req)}
+          profiles = JSON.parse(resp.body)["data"]
+          profile = profiles.find{|p| p["attributes"]["name"].include?("Morrow")}
+          abort "No Morrow profile found" unless profile
 
-          def api_get(uri, token)
-            req = Net::HTTP::Get.new(uri)
-            req["Authorization"] = "Bearer #{token}"
-            Net::HTTP.start(uri.hostname, uri.port, use_ssl: true) { |http| http.request(req) }
-          end
-
-          # 1. Find the bundle ID for com.krabople.morrow
-          bundle_uri = URI("https://api.appstoreconnect.apple.com/v1/bundleIds?filter[identifier]=com.krabople.morrow")
-          bundle_resp = api_get(bundle_uri, token)
-          bundle_data = JSON.parse(bundle_resp.body)["data"]
-          abort "Bundle ID com.krabople.morrow not found in Apple Developer Portal" if bundle_data.empty?
-          bundle_id_record = bundle_data[0]["id"]
-          puts "Found bundle ID record: #{bundle_id_record}"
-
-          # 2. Find distribution certificates
-          cert_uri = URI("https://api.appstoreconnect.apple.com/v1/certificates?filter[certificateType]=DISTRIBUTION")
-          cert_resp = api_get(cert_uri, token)
-          cert_data = JSON.parse(cert_resp.body)["data"]
-          abort "No distribution certificates found" if cert_data.empty?
-          cert_refs = cert_data.map { |c| { "id" => c["id"], "type" => "certificates" } }
-          puts "Found #{cert_refs.length} distribution certificate(s)"
-
-          # 3. Check if profile already exists
-          profile_uri = URI("https://api.appstoreconnect.apple.com/v1/profiles?filter[profileType]=IOS_APP_STORE")
-          profile_resp = api_get(profile_uri, token)
-          all_profiles = JSON.parse(profile_resp.body)["data"]
-          existing = all_profiles.select { |p|
-            p.dig("attributes", "name")&.include?("morrow") || p.dig("attributes", "name")&.include?("Morrow")
-          }
-
-          profile = nil
-          if existing.any?
-            profile = existing[0]
-            puts "Profile already exists: #{profile["attributes"]["name"]} (#{profile["attributes"]["uuid"]})"
-          else
-            puts "Creating new App Store provisioning profile..."
-            create_uri = URI("https://api.appstoreconnect.apple.com/v1/profiles")
-            req = Net::HTTP::Post.new(create_uri)
-            req["Authorization"] = "Bearer #{token}"
-            req["Content-Type"] = "application/json"
-            req.body = {
-              "data" => {
-                "type" => "profiles",
-                "attributes" => {
-                  "name" => "AppStore Morrow",
-                  "profileType" => "IOS_APP_STORE"
-                },
-                "relationships" => {
-                  "bundleId" => {
-                    "data" => { "type" => "bundleIds", "id" => bundle_id_record }
-                  },
-                  "certificates" => {
-                    "data" => cert_refs
-                  }
-                }
-              }
-            }.to_json
-
-            resp = Net::HTTP.start(create_uri.hostname, create_uri.port, use_ssl: true) { |http| http.request(req) }
-            unless resp.is_a?(Net::HTTPSuccess)
-              abort "Failed to create profile (#{resp.code}): #{resp.body}"
-            end
-            profile = JSON.parse(resp.body)["data"]
-            puts "Created profile: #{profile["attributes"]["name"]}"
-          end
-
-          # 4. Install the profile locally
-          profile_content = profile.dig("attributes", "profileContent")
-          if profile_content
-            decoded = Base64.decode64(profile_content)
-            uuid = profile["attributes"]["uuid"]
-            profiles_dir = File.expand_path("~/Library/MobileDevice/Provisioning Profiles")
-            FileUtils.mkdir_p(profiles_dir)
-            path = File.join(profiles_dir, "#{uuid}.mobileprovision")
-            File.binwrite(path, decoded)
-            puts "Installed profile: #{path}"
-          else
-            # Re-fetch with profileContent included
+          puts "Profile: #{profile["attributes"]["name"]} (#{profile["attributes"]["uuid"]})"
+          content = profile.dig("attributes","profileContent")
+          unless content
             detail_uri = URI("https://api.appstoreconnect.apple.com/v1/profiles/#{profile["id"]}?fields[profiles]=name,uuid,profileContent")
-            detail_resp = api_get(detail_uri, token)
-            detail = JSON.parse(detail_resp.body)["data"]
-            decoded = Base64.decode64(detail["attributes"]["profileContent"])
-            uuid = detail["attributes"]["uuid"]
-            profiles_dir = File.expand_path("~/Library/MobileDevice/Provisioning Profiles")
-            FileUtils.mkdir_p(profiles_dir)
-            path = File.join(profiles_dir, "#{uuid}.mobileprovision")
-            File.binwrite(path, decoded)
-            puts "Installed profile: #{path}"
+            dreq = Net::HTTP::Get.new(detail_uri)
+            dreq["Authorization"] = "Bearer #{token}"
+            dresp = Net::HTTP.start(detail_uri.hostname, detail_uri.port, use_ssl: true){|h|h.request(dreq)}
+            content = JSON.parse(dresp.body).dig("data","attributes","profileContent")
           end
+
+          dir = File.expand_path("~/Library/MobileDevice/Provisioning Profiles")
+          FileUtils.mkdir_p(dir)
+          path = File.join(dir, "#{profile["attributes"]["uuid"]}.mobileprovision")
+          File.binwrite(path, Base64.decode64(content))
+          puts "Installed: #{path}"
           RUBY
 
       - name: Archive and export signed IPA
         id: build
-        env:
-          APPSTORE_KEY_ID: ${{ secrets.APPSTORE_KEY_ID }}
-          APPSTORE_ISSUER_ID: ${{ secrets.APPSTORE_ISSUER_ID }}
         run: |
           set -euo pipefail
 
-          mkdir -p ~/private_keys
-          echo "${{ secrets.APPSTORE_PRIVATE_KEY }}" > ~/private_keys/AuthKey_${APPSTORE_KEY_ID}.p8
-
+          # Archive with manual signing overrides on command line
           xcodebuild archive \
             -project Morrow.xcodeproj \
             -scheme Morrow \
@@ -203,21 +124,18 @@ jobs:
             -destination "generic/platform=iOS" \
             -archivePath .build/Archives/Morrow.xcarchive \
             -derivedDataPath .build/DerivedData \
-            -allowProvisioningUpdates \
-            -authenticationKeyPath ~/private_keys/AuthKey_${APPSTORE_KEY_ID}.p8 \
-            -authenticationKeyID "$APPSTORE_KEY_ID" \
-            -authenticationKeyIssuerID "$APPSTORE_ISSUER_ID" \
+            CODE_SIGN_STYLE=Manual \
+            CODE_SIGN_IDENTITY="Apple Distribution" \
+            PROVISIONING_PROFILE_SPECIFIER="AppStore Morrow Shared GitHub" \
+            DEVELOPMENT_TEAM=6YYA8L76Y8 \
             CURRENT_PROJECT_VERSION=${{ github.run_number }} \
             | xcbeautify --renderer github-actions
 
+          # Export with manual signing plist
           xcodebuild -exportArchive \
             -archivePath .build/Archives/Morrow.xcarchive \
             -exportOptionsPlist Support/ExportOptions.plist \
             -exportPath .build/Export \
-            -allowProvisioningUpdates \
-            -authenticationKeyPath ~/private_keys/AuthKey_${APPSTORE_KEY_ID}.p8 \
-            -authenticationKeyID "$APPSTORE_KEY_ID" \
-            -authenticationKeyIssuerID "$APPSTORE_ISSUER_ID" \
             | xcbeautify --renderer github-actions
 
           IPA_PATH=$(find .build/Export -name '*.ipa' -print -quit)
