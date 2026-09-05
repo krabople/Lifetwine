@@ -133,6 +133,10 @@ final class MetricDefinition {
     var negativeLabel: String?
     var lastUsedAt: Date?
     var structuredOptionsJSON: String?
+    var remindersEnabled: Bool?
+    var reminderTimesText: String?
+    var reminderWeekdaysText: String?
+    var reminderMessageText: String?
 
     @Relationship(deleteRule: .cascade, inverse: \MetricEntry.metric)
     var entries: [MetricEntry]
@@ -163,6 +167,10 @@ final class MetricDefinition {
         negativeLabel: String = "No",
         lastUsedAt: Date? = nil,
         medications: [MedicationOption] = [],
+        remindersEnabled: Bool = false,
+        reminderTimes: [Int] = [],
+        reminderWeekdays: Set<Int> = [],
+        reminderMessage: String = "",
         entries: [MetricEntry] = []
     ) {
         self.id = id
@@ -190,6 +198,10 @@ final class MetricDefinition {
         self.negativeLabel = negativeLabel
         self.lastUsedAt = lastUsedAt
         self.structuredOptionsJSON = try? String(data: JSONEncoder().encode(medications), encoding: .utf8)
+        self.remindersEnabled = remindersEnabled
+        self.reminderTimesText = reminderTimes.map(String.init).joined(separator: "|")
+        self.reminderWeekdaysText = reminderWeekdays.sorted().map(String.init).joined(separator: "|")
+        self.reminderMessageText = reminderMessage
         self.entries = entries
     }
 
@@ -243,6 +255,25 @@ final class MetricDefinition {
         }
     }
 
+    var hasReminders: Bool {
+        get { remindersEnabled ?? false }
+        set { remindersEnabled = newValue }
+    }
+
+    var reminderMinutes: [Int] {
+        get { (reminderTimesText ?? "").split(separator: "|").compactMap { Int($0) } }
+        set { reminderTimesText = newValue.map(String.init).joined(separator: "|") }
+    }
+
+    var reminderWeekdays: Set<Int> {
+        get { Set((reminderWeekdaysText ?? "").split(separator: "|").compactMap { Int($0) }) }
+        set { reminderWeekdaysText = newValue.sorted().map(String.init).joined(separator: "|") }
+    }
+
+    var reminderMessage: String {
+        get { reminderMessageText ?? "" }
+        set { reminderMessageText = newValue }
+    }
+
     var supportsCorrelation: Bool { kind != .note }
 }
-

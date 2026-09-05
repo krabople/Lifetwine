@@ -83,6 +83,7 @@ struct TrackersView: View {
                                 Button {
                                     metric.isArchived = true
                                     try? modelContext.save()
+                                    rescheduleReminders()
                                 } label: {
                                     Label("Archive", systemImage: "archivebox")
                                 }
@@ -144,6 +145,7 @@ struct TrackersView: View {
                                     Button("Restore") {
                                         metric.isArchived = false
                                         try? modelContext.save()
+                                        rescheduleReminders()
                                     }
                                     .font(.caption.weight(.bold))
                                 }
@@ -249,11 +251,20 @@ struct TrackersView: View {
                     .font(.caption)
                     .foregroundStyle(LifetwineTheme.indigo)
             }
+            if metric.hasReminders && !metric.isArchived {
+                Image(systemName: "bell.fill")
+                    .font(.caption)
+                    .foregroundStyle(LifetwineTheme.mint)
+            }
             Image(systemName: "chevron.right")
                 .font(.caption.weight(.bold))
                 .foregroundStyle(.tertiary)
         }
         .contentShape(Rectangle())
     }
-}
 
+    private func rescheduleReminders() {
+        let allMetrics = metrics
+        Task { await ReminderScheduler.rebuild(for: allMetrics) }
+    }
+}

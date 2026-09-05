@@ -13,10 +13,6 @@ struct TodayView: View {
         metrics.filter { $0.isPinned && !$0.isArchived }
     }
 
-    private var activeMetrics: [MetricDefinition] {
-        metrics.filter { !$0.isArchived }
-    }
-
     private var todayEntries: [MetricEntry] {
         entries.filter { Calendar.current.isDateInToday($0.timestamp) }
     }
@@ -36,28 +32,6 @@ struct TodayView: View {
                 ScrollView {
                     LazyVStack(spacing: 16) {
                         header
-
-                        Button {
-                            showingGlobalLogger = true
-                        } label: {
-                            HStack(spacing: 12) {
-                                Image(systemName: "plus.circle.fill")
-                                    .font(.title2)
-                                VStack(alignment: .leading, spacing: 2) {
-                                    Text("Log or create anything")
-                                        .font(.headline)
-                                    Text("Search every tracker, or make a new one")
-                                        .font(.caption)
-                                        .foregroundStyle(LifetwineTheme.secondaryInk)
-                                }
-                                Spacer()
-                                Image(systemName: "magnifyingglass")
-                            }
-                            .foregroundStyle(LifetwineTheme.indigo)
-                            .padding(16)
-                            .lifetwineCard()
-                        }
-                        .buttonStyle(.plain)
 
                         HStack {
                             Text("Quick log")
@@ -208,4 +182,3 @@ struct TodayView: View {
         }
     }
 }
-

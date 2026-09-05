@@ -41,27 +41,32 @@ enum StarterLibrary {
                 aggregation: .total, role: .influence, sortOrder: 5
             ),
             MetricDefinition(
+                name: "Meditation", kind: .duration, unit: "minutes", symbol: "brain.head.profile", colorHex: "7C63C8",
+                minimumValue: 0, maximumValue: 300, stepValue: 5, defaultValue: 10,
+                aggregation: .total, role: .influence, sortOrder: 6
+            ),
+            MetricDefinition(
                 name: "Stress", kind: .scale, symbol: "waveform.path.ecg", colorHex: "EA796B",
-                lowLabel: "Calm", highLabel: "Intense", role: .outcome, isPinned: false, sortOrder: 6
+                lowLabel: "Calm", highLabel: "Intense", role: .outcome, isPinned: false, sortOrder: 7
             ),
             MetricDefinition(
                 name: "Caffeine", kind: .number, unit: "mg", symbol: "cup.and.saucer.fill", colorHex: "9A7355",
                 minimumValue: 0, maximumValue: 1000, stepValue: 20, defaultValue: 80,
-                aggregation: .total, role: .influence, isPinned: false, sortOrder: 7,
+                aggregation: .total, role: .influence, isPinned: false, sortOrder: 8,
                 quickValues: [40, 80, 120, 200]
             ),
             MetricDefinition(
                 name: "Medication", kind: .medication, symbol: "pills.fill", colorHex: "5B7CFA",
-                aggregation: .total, role: .influence, isPinned: false, sortOrder: 8
+                aggregation: .total, role: .influence, isPinned: false, sortOrder: 9
             ),
             MetricDefinition(
                 name: "Meal details", kind: .note, symbol: "takeoutbag.and.cup.and.straw.fill", colorHex: "D48A5A",
-                aggregation: .count, role: .influence, isPinned: false, sortOrder: 9
+                aggregation: .count, role: .influence, isPinned: false, sortOrder: 10
             ),
             MetricDefinition(
                 name: "Headache", kind: .yesNo, symbol: "brain.head.profile", colorHex: "D06F91",
                 minimumValue: 0, maximumValue: 1, defaultValue: 0,
-                aggregation: .latest, role: .outcome, isPinned: false, sortOrder: 10
+                aggregation: .latest, role: .outcome, isPinned: false, sortOrder: 11
             )
         ]
 
@@ -77,6 +82,15 @@ enum StarterLibrary {
         }
         if let caffeine = metrics.first(where: { $0.name == "Caffeine" && $0.quickValues.isEmpty }) {
             caffeine.quickValues = [40, 80, 120, 200]
+        }
+        if !metrics.contains(where: { $0.name.caseInsensitiveCompare("Meditation") == .orderedSame }) {
+            let meditation = MetricDefinition(
+                name: "Meditation", kind: .duration, unit: "minutes", symbol: "brain.head.profile", colorHex: "7C63C8",
+                minimumValue: 0, maximumValue: 300, stepValue: 5, defaultValue: 10,
+                aggregation: .total, role: .influence, isPinned: true,
+                sortOrder: (metrics.map(\.sortOrder).max() ?? -1) + 1
+            )
+            context.insert(meditation)
         }
         try? context.save()
     }
@@ -145,6 +159,7 @@ enum MetricTemplateLibrary {
         Template(name: "Screen time", kind: .duration, unit: "minutes", symbol: "iphone", colorHex: "5B68D8", minimum: 0, maximum: 720, step: 15, defaultValue: 60, aggregation: .total, role: .influence),
         Template(name: "Alcohol", kind: .number, unit: "drinks", symbol: "wineglass.fill", colorHex: "D06F91", minimum: 0, maximum: 20, step: 1, defaultValue: 1, aggregation: .total, role: .influence),
         Template(name: "Outside time", kind: .duration, unit: "minutes", symbol: "sun.max.fill", colorHex: "EDA84F", minimum: 0, maximum: 600, step: 10, defaultValue: 30, aggregation: .total, role: .influence),
+        Template(name: "Meditation", kind: .duration, unit: "minutes", symbol: "brain.head.profile", colorHex: "7C63C8", minimum: 0, maximum: 300, step: 5, defaultValue: 10, aggregation: .total, role: .influence, quickValues: [5, 10, 15, 20]),
         Template(name: "Digestion", kind: .scale, unit: "", symbol: "leaf.fill", colorHex: "58B89C", minimum: 1, maximum: 5, step: 1, defaultValue: 3, aggregation: .average, role: .outcome),
         Template(name: "Medication", kind: .medication, unit: "", symbol: "pills.fill", colorHex: "5B68D8", minimum: 0, maximum: 10_000, step: 1, defaultValue: 1, aggregation: .total, role: .influence, prompt: "What did you take?"),
         Template(name: "Symptoms", kind: .multiChoice, unit: "", symbol: "cross.case.fill", colorHex: "D06F91", minimum: 0, maximum: 100, step: 1, defaultValue: 1, aggregation: .latest, role: .outcome, choices: ["Headache", "Nausea", "Dizziness", "Brain fog"]),
@@ -160,4 +175,3 @@ enum MetricTemplateLibrary {
         Template(name: "Daily reflection", kind: .note, unit: "", symbol: "book.fill", colorHex: "3F7D58", minimum: 0, maximum: 100, step: 1, defaultValue: 1, aggregation: .count, role: .both)
     ]
 }
-

@@ -26,6 +26,11 @@ struct MetricEditorView: View {
     @State private var aggregation: MetricAggregation
     @State private var role: MetricRole
     @State private var isPinned: Bool
+    @State private var remindersEnabled: Bool
+    @State private var reminderTimes: [Date]
+    @State private var useSpecificDays: Bool
+    @State private var reminderWeekdays: Set<Int>
+    @State private var reminderMessage: String
 
     private let colors = ["5B68D8", "7C63C8", "A379C9", "EA796B", "EDA84F", "58B89C", "4E9CCB", "D06F91", "9A7355", "3F7D58", "59636E", "E66A9A"]
     private let symbols = [
@@ -36,6 +41,10 @@ struct MetricEditorView: View {
         "scalemass.fill", "figure.walk", "figure.strengthtraining.traditional", "lungs.fill", "eye.fill",
         "hands.sparkles.fill", "book.fill", "music.note", "person.2.fill", "briefcase.fill", "house.fill",
         "car.fill", "cart.fill", "pawprint.fill", "star.fill", "exclamationmark.bubble.fill", "checklist"
+    ]
+    private let weekdayOptions = [
+        (1, "Sun"), (2, "Mon"), (3, "Tue"), (4, "Wed"),
+        (5, "Thu"), (6, "Fri"), (7, "Sat")
     ]
 
     init(metric: MetricDefinition?) {
@@ -60,6 +69,16 @@ struct MetricEditorView: View {
         _aggregation = State(initialValue: metric?.aggregation ?? .count)
         _role = State(initialValue: metric?.role ?? .both)
         _isPinned = State(initialValue: metric?.isPinned ?? true)
+        _remindersEnabled = State(initialValue: metric?.hasReminders ?? false)
+        let calendar = Calendar.current
+        let savedReminderTimes = (metric?.reminderMinutes ?? []).map { minutes in
+            calendar.date(bySettingHour: minutes / 60, minute: minutes % 60, second: 0, of: .now) ?? .now
+        }
+        _reminderTimes = State(initialValue: savedReminderTimes)
+        let savedWeekdays = metric?.reminderWeekdays ?? []
+        _useSpecificDays = State(initialValue: !savedWeekdays.isEmpty)
+        _reminderWeekdays = State(initialValue: savedWeekdays)
+        _reminderMessage = State(initialValue: metric?.reminderMessage ?? "")
     }
 
     private var cleanChoices: [String] {
@@ -79,7 +98,8 @@ struct MetricEditorView: View {
         let rangeIsValid = ![MetricKind.scale, .number, .counter, .duration].contains(kind) || (minimum < maximum && step > 0)
         let choicesAreValid = ![MetricKind.choice, .multiChoice].contains(kind) || cleanChoices.count >= 2
         let medicationsAreValid = kind != .medication || medications.contains { !$0.name.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty }
-        return hasName && rangeIsValid && choicesAreValid && medicationsAreValid
+        let remindersAreValid = !remindersEnabled || (!reminderTimes.isEmpty && (!useSpecificDays || !reminderWeekdays.isEmpty))
+        return hasName && rangeIsValid && choicesAreValid && medicationsAreValid && remindersAreValid
     }
 
     var body: some View {
@@ -110,6 +130,8 @@ struct MetricEditorView: View {
                         .lineLimit(1...3)
                 }
 
+                remindersSection
+
                 valueSettings
                 lookSection
                 patternsSection
@@ -117,16 +139,89 @@ struct MetricEditorView: View {
             .navigationTitle(metric == nil ? "Create a tracker" : "Edit tracker")
             .navigationBarTitleDisplayMode(.inline)
             .onChange(of: kind) { _, newKind in configureDefaults(for: newKind) }
+            .onChange(of: remindersEnabled) { _, enabled in
+                guard enabled, reminderTimes.isEmpty else { return }
+                reminderTimes = [Calendar.current.date(bySettingHour: 20, minute: 0, second: 0, of: .now) ?? .now]
+            }
             .toolbar {
                 ToolbarItem(placement: .cancellationAction) {
                     Button("Cancel") { dismiss() }
                 }
                 ToolbarItem(placement: .confirmationAction) {
-                    Button(metric == nil ? "Create" : "Save") { save() }
+                    Button(metric == nil ? "Create" : "Save") { Task { await save() } }
                         .fontWeight(.bold)
                         .disabled(!canSave)
                 }
             }
+        }
+    }
+
+    private var remindersSection: some View {
+        Section {
+            Toggle("Remind me to log this", isOn: $remindersEnabled)
+
+            if remindersEnabled {
+                Picker("Repeat", selection: $useSpecificDays) {
+                    Text("Every day").tag(false)
+                    Text("Selected days").tag(true)
+                }
+                .pickerStyle(.segmented)
+
+                if useSpecificDays {
+                    HStack(spacing: 5) {
+                        ForEach(weekdayOptions, id: \.0) { weekday, label in
+                            Button {
+                                if reminderWeekdays.contains(weekday) {
+                                    reminderWeekdays.remove(weekday)
+                                } else {
+                                    reminderWeekdays.insert(weekday)
+                                }
+                                Haptics.selected()
+                            } label: {
+                                Text(label.prefix(1))
+                                    .font(.caption.weight(.bold))
+                                    .frame(maxWidth: .infinity)
+                                    .padding(.vertical, 9)
+                                    .foregroundStyle(reminderWeekdays.contains(weekday) ? Color.white : LifetwineTheme.indigo)
+                                    .background(
+                                        reminderWeekdays.contains(weekday) ? LifetwineTheme.indigo : LifetwineTheme.indigo.opacity(0.1),
+                                        in: Circle()
+                                    )
+                            }
+                            .buttonStyle(.plain)
+                            .accessibilityLabel(label)
+                        }
+                    }
+                }
+
+                ForEach(reminderTimes.indices, id: \.self) { index in
+                    HStack {
+                        Label("Reminder \(index + 1)", systemImage: "bell")
+                        Spacer()
+                        DatePicker("Time", selection: $reminderTimes[index], displayedComponents: .hourAndMinute)
+                            .labelsHidden()
+                        Button(role: .destructive) {
+                            reminderTimes.remove(at: index)
+                        } label: {
+                            Image(systemName: "minus.circle.fill")
+                        }
+                        .buttonStyle(.plain)
+                    }
+                }
+
+                Button {
+                    reminderTimes.append(Calendar.current.date(byAdding: .hour, value: 1, to: reminderTimes.last ?? .now) ?? .now)
+                } label: {
+                    Label("Add another time", systemImage: "plus.circle.fill")
+                }
+
+                TextField("Custom reminder message (optional)", text: $reminderMessage, axis: .vertical)
+                    .lineLimit(1...3)
+            }
+        } header: {
+            Text("Reminders")
+        } footer: {
+            Text("Only this tracker will trigger these private iPhone notifications. Tapping one opens it ready to log.")
         }
     }
 
@@ -394,7 +489,8 @@ struct MetricEditorView: View {
         }
     }
 
-    private func save() {
+    @MainActor
+    private func save() async {
         let cleanName = name.trimmingCharacters(in: .whitespacesAndNewlines)
         let cleanUnit = unit.trimmingCharacters(in: .whitespacesAndNewlines)
         let cleanPrompt = promptText.trimmingCharacters(in: .whitespacesAndNewlines)
@@ -422,6 +518,10 @@ struct MetricEditorView: View {
             metric.aggregation = aggregation
             metric.role = role
             metric.isPinned = isPinned
+            metric.hasReminders = remindersEnabled
+            metric.reminderMinutes = reminderMinuteValues
+            metric.reminderWeekdays = useSpecificDays ? reminderWeekdays : []
+            metric.reminderMessage = reminderMessage.trimmingCharacters(in: .whitespacesAndNewlines)
         } else {
             let newMetric = MetricDefinition(
                 name: cleanName,
@@ -446,13 +546,25 @@ struct MetricEditorView: View {
                 negativeLabel: negativeLabel,
                 medications: medications
                     .map { MedicationOption(id: $0.id, name: $0.name.trimmingCharacters(in: .whitespacesAndNewlines), defaultDose: $0.defaultDose, unit: $0.unit.trimmingCharacters(in: .whitespacesAndNewlines)) }
-                    .filter { !$0.name.isEmpty }
+                    .filter { !$0.name.isEmpty },
+                remindersEnabled: remindersEnabled,
+                reminderTimes: reminderMinuteValues,
+                reminderWeekdays: useSpecificDays ? reminderWeekdays : [],
+                reminderMessage: reminderMessage.trimmingCharacters(in: .whitespacesAndNewlines)
             )
             modelContext.insert(newMetric)
         }
         try? modelContext.save()
+        let allMetrics = (try? modelContext.fetch(FetchDescriptor<MetricDefinition>())) ?? []
+        await ReminderScheduler.rebuild(for: allMetrics)
         Haptics.logged()
         dismiss()
     }
-}
 
+    private var reminderMinuteValues: [Int] {
+        Array(Set(reminderTimes.map {
+            let components = Calendar.current.dateComponents([.hour, .minute], from: $0)
+            return (components.hour ?? 0) * 60 + (components.minute ?? 0)
+        })).sorted()
+    }
+}

@@ -1,12 +1,15 @@
 import AppIntents
 import UIKit
+import UserNotifications
 
 extension Notification.Name {
     static let openLifetwineLogger = Notification.Name("openLifetwineLogger")
+    static let openLifetwineMetric = Notification.Name("openLifetwineMetric")
 }
 
 enum QuickAccessRequest {
     private static let key = "LifetwineOpenQuickLogger"
+    private static let metricKey = "LifetwineOpenMetricID"
 
     static func request() {
         UserDefaults.standard.set(true, forKey: key)
@@ -17,6 +20,17 @@ enum QuickAccessRequest {
         let requested = UserDefaults.standard.bool(forKey: key)
         if requested { UserDefaults.standard.removeObject(forKey: key) }
         return requested
+    }
+
+    static func request(metricID: String) {
+        UserDefaults.standard.set(metricID, forKey: metricKey)
+        NotificationCenter.default.post(name: .openLifetwineMetric, object: metricID)
+    }
+
+    static func consumeMetricID() -> UUID? {
+        guard let value = UserDefaults.standard.string(forKey: metricKey) else { return nil }
+        UserDefaults.standard.removeObject(forKey: metricKey)
+        return UUID(uuidString: value)
     }
 }
 
@@ -47,11 +61,12 @@ struct LifetwineShortcuts: AppShortcutsProvider {
     }
 }
 
-final class LifetwineAppDelegate: NSObject, UIApplicationDelegate {
+final class LifetwineAppDelegate: NSObject, UIApplicationDelegate, UNUserNotificationCenterDelegate {
     func application(
         _ application: UIApplication,
         didFinishLaunchingWithOptions launchOptions: [UIApplication.LaunchOptionsKey: Any]? = nil
     ) -> Bool {
+        UNUserNotificationCenter.current().delegate = self
         if let shortcut = launchOptions?[.shortcutItem] as? UIApplicationShortcutItem,
            shortcut.type == "com.krabople.lifetwine.quicklog" {
             UserDefaults.standard.set(true, forKey: "LifetwineOpenQuickLogger")
@@ -72,5 +87,19 @@ final class LifetwineAppDelegate: NSObject, UIApplicationDelegate {
         QuickAccessRequest.request()
         completionHandler(true)
     }
-}
 
+    func userNotificationCenter(
+        _ center: UNUserNotificationCenter,
+        willPresent notification: UNNotification
+    ) async -> UNNotificationPresentationOptions {
+        [.banner, .sound]
+    }
+
+    func userNotificationCenter(
+        _ center: UNUserNotificationCenter,
+        didReceive response: UNNotificationResponse
+    ) async {
+        guard let metricID = response.notification.request.content.userInfo["metricID"] as? String else { return }
+        QuickAccessRequest.request(metricID: metricID)
+    }
+}

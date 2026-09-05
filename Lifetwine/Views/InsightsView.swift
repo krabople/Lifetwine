@@ -1,3 +1,4 @@
+import Charts
 import SwiftData
 import SwiftUI
 
@@ -19,6 +20,8 @@ struct InsightsView: View {
                         if sampleEntryCount > 0 {
                             sampleDataCard
                         }
+
+                        chartExplorerCard
 
                         if report.findings.isEmpty {
                             learningCard
@@ -49,7 +52,7 @@ struct InsightsView: View {
             .task(id: entries.count) { refreshReport() }
             .sheet(item: $selectedFinding) { finding in
                 InsightDetailView(finding: finding)
-                    .presentationDetents([.medium, .large])
+                    .presentationDetents([.large])
             }
         }
     }
@@ -119,6 +122,34 @@ struct InsightsView: View {
             )
         )
         .clipShape(RoundedRectangle(cornerRadius: 26, style: .continuous))
+    }
+
+    private var chartExplorerCard: some View {
+        NavigationLink {
+            ChartExplorerView()
+        } label: {
+            HStack(spacing: 14) {
+                Image(systemName: "chart.xyaxis.line")
+                    .font(.title2)
+                    .foregroundStyle(LifetwineTheme.indigo)
+                    .frame(width: 48, height: 48)
+                    .background(LifetwineTheme.indigo.opacity(0.1), in: Circle())
+                VStack(alignment: .leading, spacing: 3) {
+                    Text("Explore your own chart")
+                        .font(.headline)
+                        .foregroundStyle(LifetwineTheme.ink)
+                    Text("Overlay any number of trackers and date ranges.")
+                        .font(.subheadline)
+                        .foregroundStyle(LifetwineTheme.secondaryInk)
+                }
+                Spacer()
+                Image(systemName: "chevron.right")
+                    .foregroundStyle(.tertiary)
+            }
+            .padding(18)
+            .lifetwineCard()
+        }
+        .buttonStyle(.plain)
     }
 
     private var learningCard: some View {
@@ -230,13 +261,50 @@ private struct InsightDetailView: View {
     @Environment(\.dismiss) private var dismiss
     let finding: InsightFinding
 
+    private var accent: Color { finding.isPositive ? LifetwineTheme.mint : LifetwineTheme.coral }
+
+    private var regression: [RegressionPoint] {
+        guard finding.points.count > 1 else { return [] }
+        let xValues = finding.points.map(\.sourceValue)
+        let yValues = finding.points.map(\.outcomeValue)
+        let meanX = xValues.reduce(0, +) / Double(xValues.count)
+        let meanY = yValues.reduce(0, +) / Double(yValues.count)
+        let denominator = xValues.map { pow($0 - meanX, 2) }.reduce(0, +)
+        guard denominator > 0.000_001, let minimum = xValues.min(), let maximum = xValues.max() else { return [] }
+        let slope = zip(xValues, yValues).map { ($0 - meanX) * ($1 - meanY) }.reduce(0, +) / denominator
+        let intercept = meanY - slope * meanX
+        return [
+            RegressionPoint(source: minimum, outcome: intercept + slope * minimum),
+            RegressionPoint(source: maximum, outcome: intercept + slope * maximum)
+        ]
+    }
+
+    private var timeline: [TimelinePoint] {
+        let sourceValues = finding.points.map(\.sourceValue)
+        let outcomeValues = finding.points.map(\.outcomeValue)
+        return finding.points.flatMap { point in
+            [
+                TimelinePoint(
+                    date: point.outcomeDate,
+                    series: finding.sourceName,
+                    value: normalized(point.sourceValue, within: sourceValues)
+                ),
+                TimelinePoint(
+                    date: point.outcomeDate,
+                    series: finding.outcomeName,
+                    value: normalized(point.outcomeValue, within: outcomeValues)
+                )
+            ]
+        }
+    }
+
     var body: some View {
         NavigationStack {
             ScrollView {
                 VStack(alignment: .leading, spacing: 22) {
                     Image(systemName: finding.isPositive ? "arrow.up.right.circle.fill" : "arrow.down.right.circle.fill")
                         .font(.system(size: 48))
-                        .foregroundStyle(finding.isPositive ? LifetwineTheme.mint : LifetwineTheme.coral)
+                        .foregroundStyle(accent)
 
                     Text(finding.headline)
                         .font(.title2.weight(.bold))
@@ -247,6 +315,109 @@ private struct InsightDetailView: View {
                         detailRow("Timing", value: finding.lagPhrase.capitalized)
                         detailRow("Pattern strength", value: finding.strengthWord)
                         detailRow("Evidence score", value: "\(Int((finding.evidenceScore * 100).rounded()))%")
+                    }
+                    .padding(18)
+                    .lifetwineCard()
+
+                    chartSection(
+                        title: "The correlation",
+                        subtitle: "Each dot is one matched pair of days. The line shows the overall direction Lifetwine detected."
+                    ) {
+                        Chart {
+                            ForEach(finding.points) { point in
+                                PointMark(
+                                    x: .value(finding.sourceName, point.sourceValue),
+                                    y: .value(finding.outcomeName, point.outcomeValue)
+                                )
+                                .foregroundStyle(accent.opacity(0.78))
+                                .symbolSize(52)
+                            }
+                            ForEach(regression) { point in
+                                LineMark(
+                                    x: .value(finding.sourceName, point.source),
+                                    y: .value(finding.outcomeName, point.outcome),
+                                    series: .value("Trend", "Trend")
+                                )
+                                .foregroundStyle(accent)
+                                .lineStyle(StrokeStyle(lineWidth: 2.5))
+                            }
+                        }
+                        .chartXAxisLabel(finding.sourceName)
+                        .chartYAxisLabel(finding.outcomeName)
+                        .frame(height: 250)
+                    }
+
+                    chartSection(
+                        title: "How it changed over time",
+                        subtitle: finding.lagDays == 0
+                            ? "Both lines are aligned on the same day and scaled to their own low-to-high range."
+                            : "The \(finding.sourceName.lowercased()) line is shifted by \(finding.lagDays) day\(finding.lagDays == 1 ? "" : "s") so each point lines up with the outcome it was compared with."
+                    ) {
+                        Chart(timeline) { point in
+                            LineMark(
+                                x: .value("Date", point.date, unit: .day),
+                                y: .value("Relative value", point.value),
+                                series: .value("Tracker", point.series)
+                            )
+                            .interpolationMethod(.catmullRom)
+                            .foregroundStyle(by: .value("Tracker", point.series))
+                            PointMark(
+                                x: .value("Date", point.date, unit: .day),
+                                y: .value("Relative value", point.value)
+                            )
+                            .symbolSize(18)
+                            .foregroundStyle(by: .value("Tracker", point.series))
+                        }
+                        .chartForegroundStyleScale(
+                            domain: [finding.sourceName, finding.outcomeName],
+                            range: [LifetwineTheme.indigo, accent]
+                        )
+                        .chartXAxis {
+                            AxisMarks(values: .automatic(desiredCount: 5)) {
+                                AxisGridLine()
+                                AxisValueLabel(format: .dateTime.day().month(.abbreviated))
+                            }
+                        }
+                        .chartYScale(domain: 0...1)
+                        .frame(height: 250)
+                    }
+
+                    VStack(alignment: .leading, spacing: 12) {
+                        Text("Raw matched data")
+                            .font(.headline)
+                        Text("These are the exact daily values used for this result—nothing hidden or estimated.")
+                            .font(.subheadline)
+                            .foregroundStyle(LifetwineTheme.secondaryInk)
+
+                        HStack {
+                            Text("Date").frame(maxWidth: .infinity, alignment: .leading)
+                            Text(finding.sourceName).frame(maxWidth: .infinity, alignment: .trailing)
+                            Text(finding.outcomeName).frame(maxWidth: .infinity, alignment: .trailing)
+                        }
+                        .font(.caption.weight(.bold))
+                        .foregroundStyle(.secondary)
+
+                        Divider()
+
+                        ForEach(finding.points.sorted { $0.sourceDate > $1.sourceDate }) { point in
+                            HStack(alignment: .top) {
+                                VStack(alignment: .leading, spacing: 2) {
+                                    Text(point.sourceDate.formatted(.dateTime.day().month(.abbreviated)))
+                                    if finding.lagDays > 0 {
+                                        Text("Outcome \(point.outcomeDate.formatted(.dateTime.day().month(.abbreviated)))")
+                                            .font(.caption2)
+                                            .foregroundStyle(.secondary)
+                                    }
+                                }
+                                .frame(maxWidth: .infinity, alignment: .leading)
+                                Text(format(point.sourceValue, kind: finding.sourceKind, unit: finding.sourceUnit))
+                                    .frame(maxWidth: .infinity, alignment: .trailing)
+                                Text(format(point.outcomeValue, kind: finding.outcomeKind, unit: finding.outcomeUnit))
+                                    .frame(maxWidth: .infinity, alignment: .trailing)
+                            }
+                            .font(.caption)
+                            if point.id != finding.points.first?.id { Divider() }
+                        }
                     }
                     .padding(18)
                     .lifetwineCard()
@@ -276,5 +447,49 @@ private struct InsightDetailView: View {
         }
         .font(.subheadline)
     }
+
+    private func normalized(_ value: Double, within values: [Double]) -> Double {
+        guard let minimum = values.min(), let maximum = values.max(), maximum - minimum > 0.000_001 else { return 0.5 }
+        return (value - minimum) / (maximum - minimum)
+    }
+
+    private func format(_ value: Double, kind: MetricKind, unit: String) -> String {
+        if kind == .time {
+            let minutes = max(0, Int(value.rounded()))
+            return String(format: "%02d:%02d", (minutes / 60) % 24, minutes % 60)
+        }
+        if kind == .yesNo || kind == .event { return value >= 0.5 ? "Yes" : "No" }
+        let number = value.formatted(.number.precision(.fractionLength(0...2)))
+        return unit.isEmpty ? number : "\(number) \(unit)"
+    }
+
+    @ViewBuilder
+    private func chartSection<Content: View>(
+        title: String,
+        subtitle: String,
+        @ViewBuilder content: () -> Content
+    ) -> some View {
+        VStack(alignment: .leading, spacing: 12) {
+            Text(title).font(.headline)
+            Text(subtitle)
+                .font(.subheadline)
+                .foregroundStyle(LifetwineTheme.secondaryInk)
+            content()
+        }
+        .padding(18)
+        .lifetwineCard()
+    }
 }
 
+private struct RegressionPoint: Identifiable {
+    let source: Double
+    let outcome: Double
+    var id: Double { source }
+}
+
+private struct TimelinePoint: Identifiable {
+    let date: Date
+    let series: String
+    let value: Double
+    var id: String { "\(series)-\(date.timeIntervalSinceReferenceDate)" }
+}

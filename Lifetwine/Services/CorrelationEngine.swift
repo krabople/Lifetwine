@@ -70,17 +70,31 @@ struct InsightReport: Sendable {
     var daysUntilFirstInsight: Int { max(0, CorrelationEngine.minimumPairs - bestMatchedDays) }
 }
 
+struct InsightPoint: Identifiable, Hashable, Sendable {
+    let sourceDate: Date
+    let outcomeDate: Date
+    let sourceValue: Double
+    let outcomeValue: Double
+
+    var id: String {
+        "\(sourceDate.timeIntervalSinceReferenceDate)-\(outcomeDate.timeIntervalSinceReferenceDate)"
+    }
+}
+
 struct InsightFinding: Identifiable, Hashable, Sendable {
     let id: String
     let sourceName: String
     let outcomeName: String
     let sourceKind: MetricKind
     let outcomeKind: MetricKind
+    let sourceUnit: String
+    let outcomeUnit: String
     let effect: Double
     let lagDays: Int
     let sampleCount: Int
     let evidenceScore: Double
     let adjustedProbability: Double
+    let points: [InsightPoint]
 
     var isPositive: Bool { effect > 0 }
 
@@ -126,6 +140,7 @@ enum CorrelationEngine {
         let metricID: UUID
         let name: String
         let kind: MetricKind
+        let unit: String
         let role: MetricRole
         let values: [Date: Double]
     }
@@ -137,6 +152,7 @@ enum CorrelationEngine {
         let lag: Int
         let sampleCount: Int
         let pValue: Double
+        let points: [InsightPoint]
         var adjustedProbability: Double = 1
     }
 
@@ -175,8 +191,8 @@ enum CorrelationEngine {
                 for lag in 0...2 {
                     let pairs = matchedPairs(source: source.values, outcome: outcome.values, lag: lag, calendar: calendar)
                     guard pairs.count >= minimumPairs else { continue }
-                    let x = pairs.map(\.0)
-                    let y = pairs.map(\.1)
+                    let x = pairs.map(\.sourceValue)
+                    let y = pairs.map(\.outcomeValue)
                     guard standardDeviation(x) > 0.0001, standardDeviation(y) > 0.0001 else { continue }
 
                     let pearsonValue = pearson(x, y)
@@ -191,7 +207,15 @@ enum CorrelationEngine {
                         effect: robustEffect,
                         lag: lag,
                         sampleCount: pairs.count,
-                        pValue: p
+                        pValue: p,
+                        points: pairs.map {
+                            InsightPoint(
+                                sourceDate: $0.sourceDate,
+                                outcomeDate: $0.outcomeDate,
+                                sourceValue: $0.sourceValue,
+                                outcomeValue: $0.outcomeValue
+                            )
+                        }
                     )
                     let key = "\(source.identity)|\(outcome.identity)"
                     if let existing = bestByPair[key] {
@@ -217,11 +241,14 @@ enum CorrelationEngine {
                     outcomeName: candidate.outcome.name,
                     sourceKind: candidate.source.kind,
                     outcomeKind: candidate.outcome.kind,
+                    sourceUnit: candidate.source.unit,
+                    outcomeUnit: candidate.outcome.unit,
                     effect: candidate.effect,
                     lagDays: candidate.lag,
                     sampleCount: candidate.sampleCount,
                     evidenceScore: evidence,
-                    adjustedProbability: candidate.adjustedProbability
+                    adjustedProbability: candidate.adjustedProbability,
+                    points: candidate.points.sorted { $0.sourceDate < $1.sourceDate }
                 )
             }
             .sorted {
@@ -294,6 +321,7 @@ enum CorrelationEngine {
                         metricID: metric.id,
                         name: "\(metric.name): \(choice)",
                         kind: .yesNo,
+                        unit: "",
                         role: metric.role,
                         values: values
                     ))
@@ -318,6 +346,7 @@ enum CorrelationEngine {
                         metricID: metric.id,
                         name: "\(metric.name): \(medicationName)",
                         kind: .number,
+                        unit: metric.unit,
                         role: metric.role,
                         values: values
                     ))
@@ -332,6 +361,7 @@ enum CorrelationEngine {
                     metricID: metric.id,
                     name: metric.name,
                     kind: .yesNo,
+                    unit: "",
                     role: metric.role,
                     values: values
                 ))
@@ -344,6 +374,7 @@ enum CorrelationEngine {
                         metricID: metric.id,
                         name: "\(metric.name): \(choice)",
                         kind: .yesNo,
+                        unit: "",
                         role: metric.role,
                         values: binaryValues
                     ))
@@ -354,6 +385,7 @@ enum CorrelationEngine {
                     metricID: metric.id,
                     name: metric.name,
                     kind: metric.kind,
+                    unit: metric.unit,
                     role: metric.role,
                     values: values
                 ))
@@ -371,12 +403,24 @@ enum CorrelationEngine {
         outcome: [Date: Double],
         lag: Int,
         calendar: Calendar
-    ) -> [(Double, Double)] {
+    ) -> [MatchedPair] {
         source.compactMap { day, sourceValue in
             guard let outcomeDay = calendar.date(byAdding: .day, value: lag, to: day),
                   let outcomeValue = outcome[outcomeDay] else { return nil }
-            return (sourceValue, outcomeValue)
+            return MatchedPair(
+                sourceDate: day,
+                outcomeDate: outcomeDay,
+                sourceValue: sourceValue,
+                outcomeValue: outcomeValue
+            )
         }
+    }
+
+    private struct MatchedPair {
+        let sourceDate: Date
+        let outcomeDate: Date
+        let sourceValue: Double
+        let outcomeValue: Double
     }
 
     private static func pearson(_ x: [Double], _ y: [Double]) -> Double {
@@ -440,4 +484,3 @@ enum CorrelationEngine {
         }
     }
 }
-
