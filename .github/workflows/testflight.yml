@@ -47,7 +47,10 @@ jobs:
       - name: Install XcodeGen
         run: brew install xcodegen
 
-      - name: Generate release app icon\n        run: swift Support/generate-icon.swift Morrow/Resources/Assets.xcassets/AppIcon.appiconset/MorrowIcon-1024.png\n\n      - name: Generate Xcode project
+      - name: Generate release app icon
+        run: swift Support/generate-icon.swift Morrow/Resources/Assets.xcassets/AppIcon.appiconset/MorrowIcon-1024.png
+
+      - name: Generate Xcode project
         run: xcodegen generate
 
       - name: Import Apple distribution certificate
@@ -95,3 +98,4 @@ jobs:
           api-key-id: ${{ secrets.APPSTORE_KEY_ID }}
           api-private-key: ${{ secrets.APPSTORE_PRIVATE_KEY }}
           wait-for-processing: "true"
+
