@@ -8,6 +8,8 @@
 	<dict>
 		<key>com.krabople.lifetwine</key>
 		<string>AppStore Lifetwine GitHub</string>
+		<key>com.krabople.lifetwine.widget</key>
+		<string>AppStore Lifetwine Widget GitHub</string>
 	</dict>
 	<key>signingStyle</key>
 	<string>manual</string>

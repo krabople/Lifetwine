@@ -40,6 +40,15 @@ jobs:
           api-key-id: ${{ secrets.APPSTORE_KEY_ID }}
           api-private-key: ${{ secrets.APPSTORE_PRIVATE_KEY }}
 
+      - name: Download widget provisioning profile
+        uses: Apple-Actions/download-provisioning-profiles@v6
+        with:
+          bundle-id: com.krabople.lifetwine.widget
+          profile-type: IOS_APP_STORE
+          issuer-id: ${{ secrets.APPSTORE_ISSUER_ID }}
+          api-key-id: ${{ secrets.APPSTORE_KEY_ID }}
+          api-private-key: ${{ secrets.APPSTORE_PRIVATE_KEY }}
+
       - name: Archive and export signed IPA
         id: build
         uses: Apple-Actions/xcodebuild@v1
