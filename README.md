@@ -9,10 +9,11 @@ Lifetwine is a private, native iPhone app for logging anything in seconds and di
 - Unlimited user-created trackers for ratings, measurements, counters, durations, yes/no answers, single or multiple choices, times, medications, events, and notes
 - One-tap values, editable prompts, custom answer labels, colours, symbols, ranges, units, choices, and daily aggregation rules
 - A reusable medication list with usual dose and unit, while keeping every logged dose editable
-- A searchable universal logger plus a fully customisable and reorderable Today screen
+- A fully customisable and reorderable Today screen, with a searchable universal logger available from Siri, Shortcuts, widgets, and the app icon
 - Backdated logging with shortcuts for now, an hour ago, earlier today, yesterday, or any previous date
 - A clean chronological journal with search, edit, repeat, and delete actions
-- Home Screen and Lock Screen Quick Log widgets, Siri and Shortcuts support, an app-icon Quick Log action, and `lifetwine://log` deep linking
+- Configurable Home Screen widgets that chart any selected trackers over 7, 14, 30, or 90 days, plus Lock Screen Quick Log widgets, Siri and Shortcuts support, and an app-icon Quick Log action
+- Per-tracker local notification reminders with any combination of times, weekdays, and a custom message; tapping a reminder opens that tracker directly
 - A correlation engine that:
   - compares influences with outcomes
   - tests same-day, one-day, and two-day delays
@@ -21,7 +22,8 @@ Lifetwine is a private, native iPhone app for logging anything in seconds and di
   - treats structured selections and individual medications as separate signals
   - keeps free text searchable but deliberately excludes it from numerical correlations
   - requires at least seven matched days before showing a tentative comparison
-- Plain-language findings with strength, timing, sample size, and an evidence score
+- Plain-language findings with strength, timing, sample size, and an evidence score, plus a scatter plot, regression direction, aligned time-series chart, and the complete matched raw-data table behind every finding
+- An unlimited multi-tracker chart explorer with selectable date ranges and relative or original-value views
 - 21 days of clearly labelled sample history, removable at any time, for immediately exploring Patterns
 - CSV export
 - Local SwiftData storage with no account, ads, analytics, or network service
@@ -30,7 +32,7 @@ Lifetwine is a private, native iPhone app for logging anything in seconds and di
 
 ## Open and run
 
-1. Move or sync the `Lifetwine` folder to a Mac with Xcode 16 or later.
+1. Move or sync the `Lifetwine` folder to a Mac with Xcode 26 or later.
 2. Open `Lifetwine.xcodeproj`.
 3. Select the `Lifetwine` scheme and an iPhone simulator running iOS 17 or later.
 4. Press Run.
