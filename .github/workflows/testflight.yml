@@ -2,11 +2,6 @@ name: Build and upload Morrow to TestFlight
 
 on:
   workflow_dispatch:
-  push:
-    branches:
-      - morrow-release
-    paths:
-      - Support/release-trigger
 
 permissions:
   contents: read
