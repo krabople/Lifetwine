@@ -5,6 +5,7 @@ struct TaskRow: View {
     let project: ProjectItem?
     var showsScheduleLabel = true
     var showsNotes = true
+    var reorderIdentifier: String?
     let onToggle: () -> Void
 
     private var accent: Color {
@@ -19,7 +20,7 @@ struct TaskRow: View {
                     .foregroundStyle(task.isCompleted ? accent : Color.secondary)
             }
             .buttonStyle(.plain)
-            .accessibilityLabel(task.isCompleted ? "Mark incomplete" : "Mark complete")
+            .accessibilityLabel(L10n.text(task.isCompleted ? "Mark incomplete" : "Mark complete"))
 
             VStack(alignment: .leading, spacing: 7) {
                 HStack(spacing: 7) {
@@ -75,6 +76,20 @@ struct TaskRow: View {
             }
 
             Spacer(minLength: 0)
+
+            if let reorderIdentifier {
+                Image(systemName: "line.3.horizontal")
+                    .font(.body.weight(.semibold))
+                    .foregroundStyle(.secondary)
+                    .frame(width: 28, height: 38)
+                    .contentShape(Rectangle())
+                    .draggable(reorderIdentifier) {
+                        Image(systemName: "line.3.horizontal")
+                            .padding(14)
+                            .background(.regularMaterial, in: RoundedRectangle(cornerRadius: 12))
+                    }
+                    .accessibilityLabel("Reorder")
+            }
         }
         .padding(13)
         .background(accent.opacity(0.095), in: RoundedRectangle(cornerRadius: 18, style: .continuous))
@@ -88,18 +103,15 @@ struct TaskRow: View {
     }
 
     private func durationLabel(_ minutes: Int) -> String {
-        if minutes < 60 { return "\(minutes)m" }
-        let hours = minutes / 60
-        let remainder = minutes % 60
-        return remainder == 0 ? "\(hours)h" : "\(hours)h \(remainder)m"
+        L10n.duration(minutes, compact: true)
     }
 
     private func scheduleLabel(for date: Date) -> String {
         if Calendar.current.isDateInToday(date) {
-            return "Today, \(date.formatted(date: .omitted, time: .shortened))"
+            return L10n.format("today_at_time", date.formatted(date: .omitted, time: .shortened))
         }
         if Calendar.current.isDateInTomorrow(date) {
-            return "Tomorrow, \(date.formatted(date: .omitted, time: .shortened))"
+            return L10n.format("tomorrow_at_time", date.formatted(date: .omitted, time: .shortened))
         }
         return date.formatted(.dateTime.weekday(.abbreviated).day().month(.abbreviated).hour().minute())
     }
