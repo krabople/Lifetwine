@@ -1,0 +1,93 @@
+name: Rename app in App Store Connect
+
+on:
+  push:
+    branches: [morrow-release]
+    paths:
+      - Support/name-trigger
+
+permissions:
+  contents: read
+
+jobs:
+  rename:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    env:
+      APPSTORE_ISSUER_ID: ${{ secrets.APPSTORE_ISSUER_ID }}
+      APPSTORE_KEY_ID: ${{ secrets.APPSTORE_KEY_ID }}
+      APPSTORE_PRIVATE_KEY: ${{ secrets.APPSTORE_PRIVATE_KEY }}
+      APP_STORE_APP_ID: "6809041904"
+      NEW_APP_NAME: "Quiet List"
+    steps:
+      - name: Rename app
+        run: |
+          ruby <<'RUBY'
+          require "base64"
+          require "json"
+          require "net/http"
+          require "openssl"
+          require "uri"
+
+          def base64url(value)
+            Base64.urlsafe_encode64(value).delete("=")
+          end
+
+          def fixed_width(value)
+            [value.to_i.to_s(16).rjust(64, "0")].pack("H*")
+          end
+
+          now = Time.now.to_i
+          header = base64url({alg: "ES256", kid: ENV.fetch("APPSTORE_KEY_ID"), typ: "JWT"}.to_json)
+          payload = base64url({iss: ENV.fetch("APPSTORE_ISSUER_ID"), iat: now, exp: now + 900, aud: "appstoreconnect-v1"}.to_json)
+          unsigned = "#{header}.#{payload}"
+          key = OpenSSL::PKey.read(ENV.fetch("APPSTORE_PRIVATE_KEY"))
+          signature = key.dsa_sign_asn1(OpenSSL::Digest::SHA256.digest(unsigned))
+          parts = OpenSSL::ASN1.decode(signature).value
+          token = "#{unsigned}.#{base64url(parts.map { |part| fixed_width(part.value) }.join)}"
+
+          def request(method, path, token, body = nil)
+            uri = URI("https://api.appstoreconnect.apple.com#{path}")
+            request_class = method == :get ? Net::HTTP::Get : Net::HTTP::Patch
+            req = request_class.new(uri)
+            req["Authorization"] = "Bearer #{token}"
+            req["Content-Type"] = "application/json"
+            req.body = body.to_json if body
+            Net::HTTP.start(uri.hostname, uri.port, use_ssl: true) { |http| http.request(req) }
+          end
+
+          app_id = ENV.fetch("APP_STORE_APP_ID")
+          new_name = ENV.fetch("NEW_APP_NAME")
+          infos_response = request(:get, "/v1/apps/#{app_id}/appInfos?limit=200", token)
+          abort "Unable to read app infos: #{infos_response.code} #{infos_response.body}" unless infos_response.code.to_i == 200
+          infos = JSON.parse(infos_response.body).fetch("data")
+
+          localizations = infos.flat_map do |info|
+            response = request(:get, "/v1/appInfos/#{info.fetch("id")}/appInfoLocalizations?limit=200", token)
+            abort "Unable to read app localizations: #{response.code} #{response.body}" unless response.code.to_i == 200
+            JSON.parse(response.body).fetch("data")
+          end
+
+          target = localizations.find { |item| item.dig("attributes", "name").to_s.downcase.include?("morrow") } || localizations.first
+          abort "No app info localization is available to rename." unless target
+
+          current_name = target.dig("attributes", "name")
+          puts "Current app name: #{current_name}"
+          if current_name == new_name
+            puts "App is already named #{new_name}."
+            exit 0
+          end
+
+          localization_id = target.fetch("id")
+          body = {
+            data: {
+              type: "appInfoLocalizations",
+              id: localization_id,
+              attributes: {name: new_name}
+            }
+          }
+          response = request(:patch, "/v1/appInfoLocalizations/#{localization_id}", token, body)
+          abort "Unable to rename app: #{response.code} #{response.body}" unless response.code.to_i == 200
+          updated_name = JSON.parse(response.body).dig("data", "attributes", "name")
+          puts "Updated app name: #{updated_name}"
+          RUBY
