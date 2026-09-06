@@ -115,7 +115,6 @@ jobs:
         run: |
           set -euo pipefail
 
-          # Archive with manual signing overrides on command line
           xcodebuild archive \
             -project Morrow.xcodeproj \
             -scheme Morrow \
@@ -131,7 +130,6 @@ jobs:
             CURRENT_PROJECT_VERSION=${{ github.run_number }} \
             | xcbeautify --renderer github-actions
 
-          # Export with manual signing plist
           xcodebuild -exportArchive \
             -archivePath .build/Archives/Morrow.xcarchive \
             -exportOptionsPlist Support/ExportOptions.plist \
@@ -156,3 +154,13 @@ jobs:
           api-key-id: ${{ secrets.APPSTORE_KEY_ID }}
           api-private-key: ${{ secrets.APPSTORE_PRIVATE_KEY }}
           wait-for-processing: "false"
+
+      - name: Confirm Apple processing completed
+        env:
+          APPSTORE_ISSUER_ID: ${{ secrets.APPSTORE_ISSUER_ID }}
+          APPSTORE_KEY_ID: ${{ secrets.APPSTORE_KEY_ID }}
+          APPSTORE_PRIVATE_KEY: ${{ secrets.APPSTORE_PRIVATE_KEY }}
+          APP_STORE_APP_ID: "6809041904"
+          BUILD_NUMBER: ${{ github.run_number }}
+        run: ruby Support/check-testflight.rb
+
