@@ -2,6 +2,10 @@ name: Build and upload Quiet List to TestFlight
 
 on:
   workflow_dispatch:
+  push:
+    branches: [morrow-release]
+    paths:
+      - Support/release-trigger
 
 permissions:
   contents: read
