@@ -232,6 +232,15 @@
 "Delete Break" = "Elimina pausa";
 "Delete this break?" = "Eliminare questa pausa?";
 "Duration" = "Durata";
+"Sort" = "Ordina";
+"Sort by" = "Ordina per";
+"Manual" = "Manuale";
+"Date added" = "Data di aggiunta";
+"Name" = "Nome";
+"Scheduled date" = "Data programmata";
+"Ascending" = "Crescente";
+"Descending" = "Decrescente";
+"Keep this time and shift later items" = "Mantieni questo orario e sposta gli elementi successivi";
 "Edit Break" = "Modifica pausa";
 "List view" = "Vista elenco";
 "New Break" = "Nuova pausa";

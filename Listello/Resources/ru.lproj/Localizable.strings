@@ -232,6 +232,15 @@
 "Delete Break" = "Удалить перерыв";
 "Delete this break?" = "Удалить этот перерыв?";
 "Duration" = "Длительность";
+"Sort" = "Сортировка";
+"Sort by" = "Сортировать по";
+"Manual" = "Вручную";
+"Date added" = "Дата добавления";
+"Name" = "Название";
+"Scheduled date" = "Запланированная дата";
+"Ascending" = "По возрастанию";
+"Descending" = "По убыванию";
+"Keep this time and shift later items" = "Сохранить это время и сдвинуть последующие элементы";
 "Edit Break" = "Изменить перерыв";
 "List view" = "Список";
 "New Break" = "Новый перерыв";

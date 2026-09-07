@@ -2,6 +2,39 @@ import Combine
 import Foundation
 import UserNotifications
 
+private enum ShiftableScheduleItem {
+    case task(TaskItem)
+    case scheduleBreak(ScheduleBreakItem)
+}
+
+private struct ShiftableScheduleSlot {
+    let item: ShiftableScheduleItem
+    let start: Date
+    let end: Date
+}
+
+private struct OccupiedScheduleSlot {
+    let start: Date
+    let end: Date
+}
+
+private struct ScheduledTaskMove {
+    let occurrence: TaskItem
+    let newStart: Date
+}
+
+private struct ScheduledBreakMove {
+    let scheduleBreak: ScheduleBreakItem
+    let newStart: Date
+}
+
+private struct ScheduleShiftPlan {
+    var taskMoves: [ScheduledTaskMove] = []
+    var breakMoves: [ScheduledBreakMove] = []
+
+    var isEmpty: Bool { taskMoves.isEmpty && breakMoves.isEmpty }
+}
+
 @MainActor
 final class TaskStore: ObservableObject {
     @Published private(set) var tasks: [TaskItem] = []
@@ -60,14 +93,16 @@ final class TaskStore: ObservableObject {
     }
 
     var activeTasks: [TaskItem] {
-        tasks
-            .filter { task in
+        sortedTasks(
+            tasks.filter { task in
                 !task.isCompleted
                     && !task.isArchived
                     && (task.hiddenUntil ?? .distantPast) <= Date()
                     && !isHiddenFromAllTasks(task)
-            }
-            .sorted(by: listOrder)
+            },
+            by: preferences.taskSortOption,
+            direction: preferences.taskSortDirection
+        )
     }
 
     var completedTasks: [TaskItem] {
@@ -253,8 +288,11 @@ final class TaskStore: ObservableObject {
                 || task.notes.localizedCaseInsensitiveContains(cleanQuery)
             return matchesProject && matchesQuery
         }
-        if mode == .active { return filtered.sorted(by: listOrder) }
-        return filtered.sorted { ($0.completedAt ?? .distantPast) > ($1.completedAt ?? .distantPast) }
+        return sortedTasks(
+            filtered,
+            by: preferences.taskSortOption,
+            direction: preferences.taskSortDirection
+        )
     }
 
     func tasks(on day: Date) -> [TaskItem] {
@@ -399,8 +437,14 @@ final class TaskStore: ObservableObject {
         return importedCount
     }
 
-    func moveTasks(_ source: IndexSet, to destination: Int, within visibleTasks: [TaskItem]) {
-        let reordered = moved(visibleTasks, from: source, to: destination)
+    func moveTasks(
+        _ source: IndexSet,
+        to destination: Int,
+        within visibleTasks: [TaskItem],
+        direction: TaskSortDirection = .ascending
+    ) {
+        let displayedOrder = moved(visibleTasks, from: source, to: destination)
+        let reordered = direction == .ascending ? displayedOrder : Array(displayedOrder.reversed())
         let visibleIDs = Set(visibleTasks.map(\.id))
         var replacements = reordered.makeIterator()
         var allOrdered = tasks.sorted(by: listOrder)
@@ -469,6 +513,53 @@ final class TaskStore: ObservableObject {
         )
     }
 
+    func saveTaskShiftingFollowing(
+        _ task: TaskItem,
+        calendarEntries: [CalendarEntry]
+    ) async -> [TaskItem] {
+        guard
+            let chosenStart = task.scheduledAt,
+            let durationMinutes = task.expectedDurationMinutes,
+            let plan = makeShiftPlan(
+                chosenStart: chosenStart,
+                durationMinutes: durationMinutes,
+                excludingTaskID: task.id,
+                excludingBreakID: nil,
+                calendarEventIdentifier: task.calendarEventIdentifier,
+                calendarEntries: calendarEntries
+            )
+        else {
+            await saveTask(task)
+            return []
+        }
+
+        let shiftedTasks = applyShiftPlan(plan)
+        await saveTask(task)
+        return shiftedTasks
+    }
+
+    func saveBreakShiftingFollowing(
+        _ scheduleBreak: ScheduleBreakItem,
+        calendarEntries: [CalendarEntry]
+    ) -> [TaskItem] {
+        guard let plan = makeShiftPlan(
+            chosenStart: scheduleBreak.startDate,
+            durationMinutes: scheduleBreak.durationMinutes,
+            excludingTaskID: nil,
+            excludingBreakID: scheduleBreak.id,
+            calendarEventIdentifier: nil,
+            calendarEntries: calendarEntries
+        ) else {
+            saveBreak(scheduleBreak)
+            return []
+        }
+
+        let shiftedTasks = applyShiftPlan(plan)
+        saveBreak(scheduleBreak)
+        rebuildNotificationsSoon()
+        return shiftedTasks
+    }
+
     private func scheduleConflict(
         chosenStart: Date,
         durationMinutes: Int,
@@ -519,11 +610,182 @@ final class TaskStore: ObservableObject {
             candidate = calendar.date(bySettingHour: 9, minute: 0, second: 0, of: nextDay) ?? nextDay
         }
 
+        let canShiftFollowingEntries = makeShiftPlan(
+            chosenStart: chosenStart,
+            durationMinutes: durationMinutes,
+            excludingTaskID: excludingTaskID,
+            excludingBreakID: excludingBreakID,
+            calendarEventIdentifier: calendarEventIdentifier,
+            calendarEntries: calendarEntries
+        ) != nil
+
         return ScheduleConflict(
             conflictingTitle: firstConflict.title,
             chosenStart: chosenStart,
-            suggestedStart: candidate
+            suggestedStart: candidate,
+            canShiftFollowingEntries: canShiftFollowingEntries
         )
+    }
+
+    private func makeShiftPlan(
+        chosenStart: Date,
+        durationMinutes: Int,
+        excludingTaskID: UUID?,
+        excludingBreakID: UUID?,
+        calendarEventIdentifier: String?,
+        calendarEntries: [CalendarEntry]
+    ) -> ScheduleShiftPlan? {
+        let insertedEnd = chosenStart.addingTimeInterval(TimeInterval(max(1, durationMinutes) * 60))
+
+        let taskSlots = tasks(on: chosenStart).compactMap { task -> ShiftableScheduleSlot? in
+            guard
+                task.id != excludingTaskID,
+                let start = task.scheduledAt,
+                let duration = task.expectedDurationMinutes
+            else { return nil }
+            return ShiftableScheduleSlot(
+                item: .task(task),
+                start: start,
+                end: start.addingTimeInterval(TimeInterval(max(1, duration) * 60))
+            )
+        }
+        let movableCalendarIdentifiers = Set(
+            taskSlots.compactMap { slot -> String? in
+                guard case .task(let task) = slot.item else { return nil }
+                return task.calendarEventIdentifier
+            }
+        )
+        let breakSlots = breaks(on: chosenStart).compactMap { scheduleBreak -> ShiftableScheduleSlot? in
+            guard scheduleBreak.id != excludingBreakID else { return nil }
+            return ShiftableScheduleSlot(
+                item: .scheduleBreak(scheduleBreak),
+                start: scheduleBreak.startDate,
+                end: scheduleBreak.endDate
+            )
+        }
+        let fixedSlots = calendarEntries.compactMap { entry -> OccupiedScheduleSlot? in
+            guard
+                !entry.isAllDay,
+                entry.id != calendarEventIdentifier,
+                !movableCalendarIdentifiers.contains(entry.id)
+            else { return nil }
+            return OccupiedScheduleSlot(start: entry.startDate, end: entry.endDate)
+        }
+
+        guard !fixedSlots.contains(where: {
+            overlaps(start: chosenStart, end: insertedEnd, otherStart: $0.start, otherEnd: $0.end)
+        }) else { return nil }
+
+        let localSlots = (taskSlots + breakSlots).sorted { lhs, rhs in
+            if lhs.start != rhs.start { return lhs.start < rhs.start }
+            return lhs.end < rhs.end
+        }
+        var occupied = fixedSlots + [OccupiedScheduleSlot(start: chosenStart, end: insertedEnd)]
+        var ripple = [OccupiedScheduleSlot(start: chosenStart, end: insertedEnd)]
+        var plan = ScheduleShiftPlan()
+        let endOfDay = calendar.date(
+            byAdding: .day,
+            value: 1,
+            to: calendar.startOfDay(for: chosenStart)
+        ) ?? insertedEnd
+
+        for slot in localSlots {
+            let isAffected = ripple.contains {
+                overlaps(start: slot.start, end: slot.end, otherStart: $0.start, otherEnd: $0.end)
+            }
+            guard isAffected else {
+                occupied.append(OccupiedScheduleSlot(start: slot.start, end: slot.end))
+                continue
+            }
+
+            let duration = slot.end.timeIntervalSince(slot.start)
+            guard let newStart = earliestAvailableStart(
+                atOrAfter: slot.start,
+                duration: duration,
+                occupied: occupied,
+                noLaterThan: endOfDay
+            ) else { return nil }
+
+            let shiftedSlot = OccupiedScheduleSlot(
+                start: newStart,
+                end: newStart.addingTimeInterval(duration)
+            )
+            occupied.append(shiftedSlot)
+            ripple.append(shiftedSlot)
+
+            switch slot.item {
+            case .task(let task):
+                plan.taskMoves.append(ScheduledTaskMove(occurrence: task, newStart: newStart))
+            case .scheduleBreak(let scheduleBreak):
+                plan.breakMoves.append(ScheduledBreakMove(scheduleBreak: scheduleBreak, newStart: newStart))
+            }
+        }
+
+        return plan.isEmpty ? nil : plan
+    }
+
+    private func earliestAvailableStart(
+        atOrAfter start: Date,
+        duration: TimeInterval,
+        occupied: [OccupiedScheduleSlot],
+        noLaterThan endOfDay: Date
+    ) -> Date? {
+        var candidate = start
+        for _ in 0..<500 {
+            let candidateEnd = candidate.addingTimeInterval(duration)
+            if candidateEnd > endOfDay { return nil }
+            let overlappingEnds = occupied.compactMap { slot -> Date? in
+                overlaps(start: candidate, end: candidateEnd, otherStart: slot.start, otherEnd: slot.end)
+                    ? slot.end
+                    : nil
+            }
+            guard let latestEnd = overlappingEnds.max() else { return candidate }
+            candidate = latestEnd
+        }
+        return nil
+    }
+
+    private func applyShiftPlan(_ plan: ScheduleShiftPlan) -> [TaskItem] {
+        var shiftedTasks: [TaskItem] = []
+
+        for move in plan.taskMoves {
+            guard let index = tasks.firstIndex(where: { $0.id == move.occurrence.id }) else { continue }
+            if tasks[index].isRecurring, let occurrenceDate = move.occurrence.scheduledAt {
+                if !tasks[index].recurrenceExceptions.contains(where: {
+                    calendar.isDate($0, inSameDayAs: occurrenceDate)
+                }) {
+                    tasks[index].recurrenceExceptions.append(occurrenceDate)
+                }
+                if move.occurrence.calendarEventIdentifier != nil {
+                    tasks[index].calendarEventIdentifier = nil
+                }
+
+                let shiftedOccurrence = TaskItem(
+                    title: move.occurrence.title,
+                    notes: move.occurrence.notes,
+                    createdAt: move.occurrence.createdAt,
+                    scheduledAt: move.newStart,
+                    expectedDurationMinutes: move.occurrence.expectedDurationMinutes,
+                    notifiesAtScheduledTime: move.occurrence.notifiesAtScheduledTime,
+                    isImportant: move.occurrence.isImportant,
+                    projectID: move.occurrence.projectID,
+                    sortIndex: nextSortIndex,
+                    calendarEventIdentifier: move.occurrence.calendarEventIdentifier
+                )
+                tasks.append(shiftedOccurrence)
+                shiftedTasks.append(shiftedOccurrence)
+            } else {
+                tasks[index].scheduledAt = move.newStart
+                shiftedTasks.append(tasks[index])
+            }
+        }
+
+        for move in plan.breakMoves {
+            guard let index = scheduleBreaks.firstIndex(where: { $0.id == move.scheduleBreak.id }) else { continue }
+            scheduleBreaks[index].startDate = move.newStart
+        }
+
+        return shiftedTasks
     }
 
     func isDayNotificationsEnabled(_ day: Date) -> Bool {
@@ -611,6 +873,16 @@ final class TaskStore: ObservableObject {
         persist()
     }
 
+    func setTaskSortOption(_ option: TaskSortOption) {
+        preferences.taskSortOption = option
+        persist()
+    }
+
+    func setTaskSortDirection(_ direction: TaskSortDirection) {
+        preferences.taskSortDirection = direction
+        persist()
+    }
+
     @discardableResult
     func applyAutomaticArchiving(now: Date = Date()) -> Int {
         guard let delayDays = preferences.completedArchiveDelayDays else { return 0 }
@@ -651,6 +923,115 @@ final class TaskStore: ObservableObject {
         let rightIndex = rhs.sortIndex ?? Int.max
         if leftIndex != rightIndex { return leftIndex < rightIndex }
         return lhs.createdAt < rhs.createdAt
+    }
+
+    func sortedTasks(
+        _ candidates: [TaskItem],
+        by option: TaskSortOption,
+        direction: TaskSortDirection
+    ) -> [TaskItem] {
+        candidates.sorted { lhs, rhs in
+            if preferences.importantTasksFirst,
+               option != .importance,
+               lhs.isImportant != rhs.isImportant {
+                return lhs.isImportant && !rhs.isImportant
+            }
+
+            if let missingValueOrder = missingValueOrder(lhs, rhs, by: option) {
+                return missingValueOrder
+            }
+
+            let comparison = taskComparison(lhs, rhs, by: option)
+            if comparison != .orderedSame {
+                return direction == .ascending
+                    ? comparison == .orderedAscending
+                    : comparison == .orderedDescending
+            }
+
+            let leftIndex = lhs.sortIndex ?? Int.max
+            let rightIndex = rhs.sortIndex ?? Int.max
+            if leftIndex != rightIndex { return leftIndex < rightIndex }
+            if lhs.createdAt != rhs.createdAt { return lhs.createdAt < rhs.createdAt }
+            return lhs.id.uuidString < rhs.id.uuidString
+        }
+    }
+
+    private func missingValueOrder(
+        _ lhs: TaskItem,
+        _ rhs: TaskItem,
+        by option: TaskSortOption
+    ) -> Bool? {
+        switch option {
+        case .projectOrList:
+            return presentValuesFirst(
+                project(withID: lhs.projectID)?.name,
+                project(withID: rhs.projectID)?.name
+            )
+        case .scheduledDate:
+            return presentValuesFirst(lhs.scheduledAt, rhs.scheduledAt)
+        case .duration:
+            return presentValuesFirst(lhs.expectedDurationMinutes, rhs.expectedDurationMinutes)
+        default:
+            return nil
+        }
+    }
+
+    private func presentValuesFirst<T>(_ lhs: T?, _ rhs: T?) -> Bool? {
+        switch (lhs, rhs) {
+        case (_?, nil): return true
+        case (nil, _?): return false
+        default: return nil
+        }
+    }
+
+    private func taskComparison(
+        _ lhs: TaskItem,
+        _ rhs: TaskItem,
+        by option: TaskSortOption
+    ) -> ComparisonResult {
+        switch option {
+        case .manual:
+            return compare(lhs.sortIndex ?? Int.max, rhs.sortIndex ?? Int.max)
+        case .dateAdded:
+            return compare(lhs.createdAt, rhs.createdAt)
+        case .name:
+            return lhs.title.localizedStandardCompare(rhs.title)
+        case .projectOrList:
+            return compareOptionalText(
+                project(withID: lhs.projectID)?.name,
+                project(withID: rhs.projectID)?.name
+            )
+        case .scheduledDate:
+            return compareOptional(lhs.scheduledAt, rhs.scheduledAt)
+        case .duration:
+            return compareOptional(lhs.expectedDurationMinutes, rhs.expectedDurationMinutes)
+        case .importance:
+            return compare(lhs.isImportant ? 1 : 0, rhs.isImportant ? 1 : 0)
+        }
+    }
+
+    private func compare<T: Comparable>(_ lhs: T, _ rhs: T) -> ComparisonResult {
+        if lhs < rhs { return .orderedAscending }
+        if lhs > rhs { return .orderedDescending }
+        return .orderedSame
+    }
+
+    private func compareOptional<T: Comparable>(_ lhs: T?, _ rhs: T?) -> ComparisonResult {
+        switch (lhs, rhs) {
+        case let (left?, right?): return compare(left, right)
+        case (nil, nil): return .orderedSame
+        case (nil, _): return .orderedDescending
+        case (_, nil): return .orderedAscending
+        }
+    }
+
+    private func compareOptionalText(_ lhs: String?, _ rhs: String?) -> ComparisonResult {
+        switch (lhs, rhs) {
+        case let (left?, right?): return left.localizedStandardCompare(right)
+        case (nil, nil): return .orderedSame
+        case (nil, _): return .orderedDescending
+        case (_, nil): return .orderedAscending
+        }
     }
 
     private func validProjectID(_ id: UUID?) -> UUID? {
