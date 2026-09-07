@@ -1,13 +1,7 @@
 name: Build and upload Listello to TestFlight
-# Release reliable reordering
 
 on:
   workflow_dispatch:
-  push:
-    branches:
-      - morrow-release
-    paths:
-      - .github/workflows/testflight.yml
 
 permissions:
   contents: read
