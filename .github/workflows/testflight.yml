@@ -2,6 +2,9 @@ name: Build and upload Listello to TestFlight
 
 on:
   workflow_dispatch:
+  push:
+    branches:
+      - morrow-release
 
 permissions:
   contents: read
@@ -205,3 +208,4 @@ jobs:
           APP_STORE_APP_ID: "6809041904"
           BUILD_NUMBER: ${{ github.run_number }}
         run: ruby Support/check-testflight.rb
+
