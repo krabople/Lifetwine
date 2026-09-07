@@ -126,34 +126,6 @@ final class TaskStoreTests: XCTestCase {
         XCTAssertEqual(restored.orderedProjects.map(\.name), ["Beta", "Alpha"])
     }
 
-    func testNearestReorderTargetUsesRowCentres() {
-        let first = UUID()
-        let second = UUID()
-        let third = UUID()
-        let frames = [
-            first: CGRect(x: 0, y: 0, width: 300, height: 40),
-            second: CGRect(x: 0, y: 50, width: 300, height: 40),
-            third: CGRect(x: 0, y: 100, width: 300, height: 40)
-        ]
-
-        XCTAssertEqual(
-            nearestReorderTarget(
-                to: CGPoint(x: 290, y: 77),
-                frames: frames,
-                allowedIDs: [first, second, third]
-            ),
-            second
-        )
-        XCTAssertEqual(
-            nearestReorderTarget(
-                to: CGPoint(x: 20, y: 500),
-                frames: frames,
-                allowedIDs: [first, second, third]
-            ),
-            third
-        )
-    }
-
     func testReminderImportUsesDestinationTerminologyDefaults() {
         let store = makeStore()
         let list = store.addProject(name: "Reading", color: .mint, kind: .list)!
@@ -169,6 +141,27 @@ final class TaskStoreTests: XCTestCase {
         XCTAssertEqual(imported?.notes, "From a friend")
         XCTAssertTrue(imported?.isImportant == true)
         XCTAssertNil(imported?.expectedDurationMinutes)
+    }
+
+    func testMergingRemindersAddsOnlyNewTitles() {
+        let store = makeStore()
+        let project = store.addProject(name: "Shopping", color: .mint)!
+        store.addTask(title: "Milk", projectID: project.id)
+
+        let reminders = [
+            ImportedReminder(title: " milk ", notes: "Duplicate", dueDate: nil, isImportant: false),
+            ImportedReminder(title: "Bread", notes: "Fresh", dueDate: nil, isImportant: false),
+            ImportedReminder(title: "BREAD", notes: "Duplicate in source", dueDate: nil, isImportant: false)
+        ]
+
+        XCTAssertEqual(
+            store.importReminders(reminders, into: project, skippingExistingTitles: true),
+            1
+        )
+        XCTAssertEqual(
+            store.filteredTasks(mode: .active, query: "", projectID: project.id).map(\.title),
+            ["Milk", "Bread"]
+        )
     }
 
     func testLegacyProjectsRemainVisibleProjects() throws {
@@ -406,7 +399,7 @@ final class LocalizationTests: XCTestCase {
             "add_to_list", "add_to_project", "archived_on", "calendar_name", "delete_project_named",
             "duration_minutes", "imported_reminders_summary", "items_in_list", "keep_time",
             "one_item_in_list", "one_open_task_in_project", "open_tasks_in_project",
-            "remove_duration", "schedule_conflict_message",
+            "merge_into_named_kind", "reminders_name_conflict", "remove_duration", "schedule_conflict_message",
             "to_time", "today_at_time", "tomorrow_at_time", "use_time"
         ]
 
@@ -442,4 +435,3 @@ final class LocalizationTests: XCTestCase {
             + value.components(separatedBy: "%d").count - 1
     }
 }
-

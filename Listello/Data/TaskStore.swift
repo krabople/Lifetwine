@@ -41,7 +41,15 @@ final class TaskStore: ObservableObject {
             self.storageURL = newURL
         }
 
+        #if DEBUG
+        if ProcessInfo.processInfo.arguments.contains("--listello-reordering-ui-test") {
+            seedReorderingUITestData()
+        } else {
+            load()
+        }
+        #else
         load()
+        #endif
         normalizePreferences()
         normalizeSortIndices()
         normalizeProjectSortIndices()
@@ -359,12 +367,22 @@ final class TaskStore: ObservableObject {
     }
 
     @discardableResult
-    func importReminders(_ reminders: [ImportedReminder], into project: ProjectItem) -> Int {
+    func importReminders(
+        _ reminders: [ImportedReminder],
+        into project: ProjectItem,
+        skippingExistingTitles: Bool = false
+    ) -> Int {
         guard projects.contains(where: { $0.id == project.id }) else { return 0 }
         var importedCount = 0
+        var existingTitles = skippingExistingTitles
+            ? Set(tasks.lazy.filter { $0.projectID == project.id }.map { self.normalizedTitle($0.title) })
+            : []
+
         for reminder in reminders {
             let cleanTitle = reminder.title.trimmingCharacters(in: .whitespacesAndNewlines)
             guard !cleanTitle.isEmpty else { continue }
+            let titleKey = normalizedTitle(cleanTitle)
+            guard !skippingExistingTitles || !existingTitles.contains(titleKey) else { continue }
             tasks.append(TaskItem(
                 title: cleanTitle,
                 notes: reminder.notes,
@@ -374,6 +392,7 @@ final class TaskStore: ObservableObject {
                 projectID: project.id,
                 sortIndex: nextSortIndex
             ))
+            existingTitles.insert(titleKey)
             importedCount += 1
         }
         persist()
@@ -644,6 +663,12 @@ final class TaskStore: ObservableObject {
         return projects.first(where: { $0.id == projectID })?.hidesFromAllTasks == true
     }
 
+    private func normalizedTitle(_ title: String) -> String {
+        title
+            .trimmingCharacters(in: .whitespacesAndNewlines)
+            .folding(options: [.caseInsensitive, .diacriticInsensitive], locale: .current)
+    }
+
     private func moved<Element>(_ values: [Element], from source: IndexSet, to destination: Int) -> [Element] {
         guard !source.isEmpty else { return values }
         let moving = source.map { values[$0] }
@@ -746,6 +771,52 @@ final class TaskStore: ObservableObject {
         notificationDayKeys = state.notificationDayKeys
         preferences = state.preferences
     }
+
+    #if DEBUG
+    private func seedReorderingUITestData() {
+        tasks = [
+            TaskItem(
+                id: UUID(uuidString: "11111111-1111-1111-1111-111111111111")!,
+                title: "First task",
+                sortIndex: 0
+            ),
+            TaskItem(
+                id: UUID(uuidString: "22222222-2222-2222-2222-222222222222")!,
+                title: "Second task",
+                sortIndex: 1
+            ),
+            TaskItem(
+                id: UUID(uuidString: "33333333-3333-3333-3333-333333333333")!,
+                title: "Third task",
+                sortIndex: 2
+            )
+        ]
+        projects = [
+            ProjectItem(
+                id: UUID(uuidString: "AAAAAAAA-AAAA-AAAA-AAAA-AAAAAAAAAAAA")!,
+                name: "Alpha project",
+                color: .teal,
+                sortIndex: 0
+            ),
+            ProjectItem(
+                id: UUID(uuidString: "BBBBBBBB-BBBB-BBBB-BBBB-BBBBBBBBBBBB")!,
+                name: "Beta project",
+                color: .sky,
+                sortIndex: 1
+            ),
+            ProjectItem(
+                id: UUID(uuidString: "CCCCCCCC-CCCC-CCCC-CCCC-CCCCCCCCCCCC")!,
+                name: "Gamma project",
+                color: .amber,
+                sortIndex: 2
+            )
+        ]
+        scheduleBreaks = []
+        notificationDayKeys = []
+        preferences = ListelloPreferences()
+        persist()
+    }
+    #endif
 
     private func normalizePreferences() {
         let cleaned = Array(Set(preferences.durationOptions.filter { (1...1_440).contains($0) })).sorted()

@@ -9,11 +9,6 @@ struct ProjectsSidebar: View {
     @State private var editingProject: ProjectItem?
     @State private var newProject: ProjectItem?
     @State private var projectToDelete: ProjectItem?
-    @State private var draggedProjectID: UUID?
-    @State private var lastProjectDropTargetID: UUID?
-    @State private var projectRowFrames: [UUID: CGRect] = [:]
-
-    private let projectReorderSpace = "listello-project-reorder"
 
     var body: some View {
         VStack(alignment: .leading, spacing: 0) {
@@ -61,11 +56,14 @@ struct ProjectsSidebar: View {
                         .listRowSeparator(.hidden)
                         .listRowBackground(Color.clear)
                 }
+                .onMove { source, destination in
+                    withAnimation(.snappy) {
+                        store.moveProjects(source, to: destination)
+                    }
+                }
             }
             .listStyle(.plain)
             .scrollContentBackground(.hidden)
-            .coordinateSpace(name: projectReorderSpace)
-            .onPreferenceChange(ListelloReorderFramesKey.self) { projectRowFrames = $0 }
 
             Divider()
 
@@ -172,12 +170,14 @@ struct ProjectsSidebar: View {
                     .foregroundStyle(.secondary)
             }
 
-            ListelloReorderHandle(
-                coordinateSpace: projectReorderSpace,
-                isDragging: draggedProjectID == project.id,
-                onChanged: { reorderProject(project.id, at: $0) },
-                onEnded: finishProjectReorder
-            )
+            Image(systemName: "line.3.horizontal")
+                .font(.body.weight(.semibold))
+                .foregroundStyle(.secondary)
+                .frame(width: 36, height: 44)
+                .contentShape(Rectangle())
+                .accessibilityLabel("Reorder")
+                .accessibilityHint("Touch and hold, then drag up or down")
+                .accessibilityIdentifier("project-reorder-\(project.id.uuidString)")
         }
         .contentShape(Rectangle())
         .background(
@@ -188,9 +188,8 @@ struct ProjectsSidebar: View {
             if selectedProjectID == project.id {
                 RoundedRectangle(cornerRadius: 15, style: .continuous)
                     .stroke(project.color.tint.opacity(0.45), lineWidth: 1)
-            }
+                }
         }
-        .listelloReorderFrame(id: project.id, in: projectReorderSpace)
     }
 
     private func selectionRow(
@@ -257,37 +256,4 @@ struct ProjectsSidebar: View {
         withAnimation(.snappy) { isPresented = false }
     }
 
-    private func reorderProject(_ projectID: UUID, at location: CGPoint) {
-        if draggedProjectID == nil {
-            draggedProjectID = projectID
-            lastProjectDropTargetID = projectID
-        }
-
-        let currentProjects = store.orderedProjects
-        guard
-            draggedProjectID == projectID,
-            let targetID = nearestReorderTarget(
-                to: location,
-                frames: projectRowFrames,
-                allowedIDs: Set(currentProjects.map(\.id))
-            )
-        else { return }
-
-        if targetID == projectID {
-            lastProjectDropTargetID = projectID
-            return
-        }
-        guard lastProjectDropTargetID != targetID else { return }
-
-        lastProjectDropTargetID = targetID
-        withAnimation(.snappy) {
-            store.moveProject(projectID, relativeTo: targetID)
-        }
-    }
-
-    private func finishProjectReorder() {
-        draggedProjectID = nil
-        lastProjectDropTargetID = nil
-    }
 }
-

@@ -5,10 +5,7 @@ struct TaskRow: View {
     let project: ProjectItem?
     var showsScheduleLabel = true
     var showsNotes = true
-    var reorderCoordinateSpace: String?
-    var isBeingReordered = false
-    var onReorderChanged: ((CGPoint) -> Void)?
-    var onReorderEnded: (() -> Void)?
+    var showsReorderHandle = false
     let onToggle: () -> Void
 
     private var accent: Color {
@@ -80,13 +77,15 @@ struct TaskRow: View {
 
             Spacer(minLength: 0)
 
-            if let reorderCoordinateSpace, let onReorderChanged, let onReorderEnded {
-                ListelloReorderHandle(
-                    coordinateSpace: reorderCoordinateSpace,
-                    isDragging: isBeingReordered,
-                    onChanged: onReorderChanged,
-                    onEnded: onReorderEnded
-                )
+            if showsReorderHandle {
+                Image(systemName: "line.3.horizontal")
+                    .font(.body.weight(.semibold))
+                    .foregroundStyle(.secondary)
+                    .frame(width: 36, height: 44)
+                    .contentShape(Rectangle())
+                    .accessibilityLabel("Reorder")
+                    .accessibilityHint("Touch and hold, then drag up or down")
+                    .accessibilityIdentifier("task-reorder-\(task.id.uuidString)")
             }
         }
         .padding(13)
@@ -118,4 +117,3 @@ struct TaskRow: View {
         date < Date()
     }
 }
-
