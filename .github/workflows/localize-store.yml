@@ -2,6 +2,11 @@ name: Localize Listello App Store listing
 
 on:
   workflow_dispatch:
+  push:
+    branches:
+      - main
+    paths:
+      - .github/workflows/localize-store.yml
 
 permissions:
   contents: read
@@ -27,3 +32,4 @@ jobs:
 
       - name: Update App Store localizations
         run: ruby Support/update-store-localizations.rb
+
