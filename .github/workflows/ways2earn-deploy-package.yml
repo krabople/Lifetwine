@@ -1,0 +1,24 @@
+name: Ways2Earn deployment package
+
+on:
+  workflow_dispatch:
+
+jobs:
+  package:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Restore deployment archive
+        env:
+          W2E_DEPLOY_ZIP_B64: ${{ secrets.W2E_DEPLOY_ZIP_B64 }}
+        run: printf '%s' "$W2E_DEPLOY_ZIP_B64" | base64 --decode > ways2earn-mobile-public-api-admin-20260924.zip
+
+      - name: Verify deployment archive
+        run: echo 'C2F4DCA85107E3643AAFE54BC1AD95CA7B1E9318A9F25ECC36DBCD116E73C1B7  ways2earn-mobile-public-api-admin-20260924.zip' | sha256sum --check
+
+      - name: Upload deployment archive
+        uses: actions/upload-artifact@v4
+        with:
+          name: ways2earn-mobile-public-api-admin-20260924
+          path: ways2earn-mobile-public-api-admin-20260924.zip
+          retention-days: 1
+          if-no-files-found: error
