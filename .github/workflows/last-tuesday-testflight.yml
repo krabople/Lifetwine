@@ -1,0 +1,240 @@
+# Install in krabople/Lifetwine/.github/workflows/last-tuesday-testflight.yml.
+# That repository already holds the owner's Apple distribution signing secrets.
+name: The Last Tuesday to TestFlight
+
+on:
+  workflow_dispatch:
+    inputs:
+      source_ref:
+        description: Exact 40-character commit from krabople/TheLastTuesday
+        required: true
+        type: string
+      setup_only:
+        description: Register the bundle and profile without building or uploading
+        required: true
+        default: true
+        type: boolean
+
+permissions:
+  contents: read
+
+concurrency:
+  group: last-tuesday-testflight
+  cancel-in-progress: false
+
+jobs:
+  release:
+    runs-on: macos-26
+    timeout-minutes: 90
+    defaults:
+      run:
+        shell: bash
+        working-directory: source
+    env:
+      APP_BUNDLE_ID: com.bellwether.lasttuesday
+      TEAM_ID: 6YYA8L76Y8
+      APP_NAME: The Last Tuesday
+      BUILD_NUMBER: ${{ github.run_number }}
+      SOURCE_REF: ${{ inputs.source_ref }}
+
+    steps:
+      - name: Validate immutable source revision
+        working-directory: ${{ github.workspace }}
+        run: |
+          set -euo pipefail
+          [[ "$SOURCE_REF" =~ ^[0-9a-fA-F]{40}$ ]] || { echo 'Provide an exact 40-character source commit.' >&2; exit 1; }
+
+      - name: Check out the reviewed game
+        uses: actions/checkout@v7
+        with:
+          repository: krabople/TheLastTuesday
+          ref: ${{ inputs.source_ref }}
+          path: source
+          ssh-key: ${{ secrets.LAST_TUESDAY_SOURCE_DEPLOY_KEY }}
+          persist-credentials: false
+
+      - name: Verify checked-out revision
+        run: |
+          set -euo pipefail
+          [[ "$(git rev-parse HEAD)" == "$(printf '%s' "$SOURCE_REF" | tr 'A-F' 'a-f')" ]]
+          printf 'Source: `krabople/TheLastTuesday@%s`\n' "$SOURCE_REF" >> "$GITHUB_STEP_SUMMARY"
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v6
+        with:
+          node-version: '24'
+
+      - name: Validate signing configuration
+        env:
+          BUILD_CERTIFICATE_BASE64: ${{ secrets.BUILD_CERTIFICATE_BASE64 }}
+          P12_PASSWORD: ${{ secrets.P12_PASSWORD }}
+          APPSTORE_ISSUER_ID: ${{ secrets.APPSTORE_ISSUER_ID }}
+          APPSTORE_KEY_ID: ${{ secrets.APPSTORE_KEY_ID }}
+          APPSTORE_PRIVATE_KEY: ${{ secrets.APPSTORE_PRIVATE_KEY }}
+        run: |
+          set -euo pipefail
+          for name in BUILD_CERTIFICATE_BASE64 P12_PASSWORD APPSTORE_ISSUER_ID APPSTORE_KEY_ID APPSTORE_PRIVATE_KEY; do
+            [[ -n "${!name:-}" ]] || { printf 'Missing release secret: %s\n' "$name" >&2; exit 1; }
+          done
+
+      - name: Import existing Apple distribution identity
+        uses: Apple-Actions/import-codesign-certs@v7
+        with:
+          p12-file-base64: ${{ secrets.BUILD_CERTIFICATE_BASE64 }}
+          p12-password: ${{ secrets.P12_PASSWORD }}
+
+      - name: Identify imported distribution certificate
+        run: |
+          set -euo pipefail
+          python3 - <<'PY'
+          import os, re, subprocess
+          identities = subprocess.check_output(['security', 'find-identity', '-v', '-p', 'codesigning', 'signing_temp.keychain'], text=True)
+          matches = sorted(set(re.findall(r'\b([0-9A-F]{40})\s+"(?:Apple Distribution|iPhone Distribution):[^"\n]+\(' + re.escape(os.environ['TEAM_ID']) + r'\)"', identities)))
+          if len(matches) != 1:
+              raise SystemExit('Expected one imported distribution identity for the configured team.')
+          with open(os.environ['GITHUB_ENV'], 'a') as output:
+              output.write('CERTIFICATE_SHA1=' + matches[0] + '\n')
+              output.write('SIGNING_DIR=' + os.path.join(os.environ['RUNNER_TEMP'], 'last-tuesday-signing') + '\n')
+          print('Verified the imported distribution identity belongs to the configured team.')
+          PY
+
+      - name: Prepare bundle identifier and provisioning profile
+        id: apple
+        env:
+          APPSTORE_ISSUER_ID: ${{ secrets.APPSTORE_ISSUER_ID }}
+          APPSTORE_KEY_ID: ${{ secrets.APPSTORE_KEY_ID }}
+          APPSTORE_PRIVATE_KEY: ${{ secrets.APPSTORE_PRIVATE_KEY }}
+        run: node scripts/ci/apple-setup.mjs --apply --output-dir "$SIGNING_DIR"
+
+      - name: Record signing setup result
+        run: |
+          node --input-type=module - <<'JS'
+          import {readFile,appendFile} from 'node:fs/promises';
+          const result=JSON.parse(await readFile(`${process.env.SIGNING_DIR}/manifest.json`,'utf8'));
+          const status=result.appRecordRequired
+            ? 'Create the iOS app record in App Store Connect with bundle com.bellwether.lasttuesday, then run this workflow with setup_only=false.'
+            : `App Store Connect record ${result.appId} is ready. Run with setup_only=false to upload.`;
+          await appendFile(process.env.GITHUB_STEP_SUMMARY,`\nBundle and profile ready. ${status}\n`);
+          JS
+
+      - name: Keep non-secret setup summary
+        if: ${{ always() && steps.apple.outcome == 'success' }}
+        uses: actions/upload-artifact@v7
+        with:
+          name: LastTuesday-signing-summary-${{ github.run_number }}
+          path: ${{ runner.temp }}/last-tuesday-signing/manifest.json
+          retention-days: 7
+          if-no-files-found: error
+
+      - name: Require App Store Connect record before release
+        if: ${{ !inputs.setup_only && steps.apple.outputs.app_record_required == 'true' }}
+        run: |
+          echo '::error::Create The Last Tuesday app record in App Store Connect using bundle com.bellwether.lasttuesday. Its bundle and distribution profile are now registered. Rerun after creating the record.'
+          exit 1
+
+      - name: Install and check the game
+        if: ${{ !inputs.setup_only }}
+        run: |
+          set -euo pipefail
+          npm ci
+          node --test scripts/ci/delivery.test.mjs
+          python3 scripts/ci/test_native_helpers.py
+          npm run test:touch:unit
+          npm run ios:prepare
+
+      - name: Verify the packaged game on iPhone and iPad
+        if: ${{ !inputs.setup_only }}
+        run: bash scripts/ci/build-ios.sh
+
+      - name: Keep native screenshots and smoke result
+        if: ${{ always() && !inputs.setup_only }}
+        uses: actions/upload-artifact@v7
+        with:
+          name: LastTuesday-native-${{ github.run_number }}
+          # This public hub only retains screenshots and non-secret verification.
+          path: |
+            source/artifacts/ios/TheLastTuesday-*.png
+            source/artifacts/ios/native-smoke.json
+            source/artifacts/ios/xcode-version.log
+          retention-days: 7
+          if-no-files-found: warn
+
+      - name: Configure manual device signing
+        if: ${{ !inputs.setup_only }}
+        run: |
+          set -euo pipefail
+          ruby -e "require 'xcodeproj'" || gem install --user-install xcodeproj --no-document
+          ruby scripts/ci/configure-signing.rb
+
+      - name: Archive and export the game
+        if: ${{ !inputs.setup_only }}
+        id: archive
+        run: |
+          set -euo pipefail
+          if xcodebuild archive -project ios/App/App.xcodeproj -scheme App -configuration Release \
+              -destination 'generic/platform=iOS' -archivePath "$RUNNER_TEMP/TheLastTuesday.xcarchive" \
+              -derivedDataPath "$RUNNER_TEMP/last-tuesday-device" > "$RUNNER_TEMP/last-tuesday-archive.log" 2>&1; then
+            echo 'Device archive succeeded.'
+          else
+            result=$?
+            tail -n 100 "$RUNNER_TEMP/last-tuesday-archive.log"
+            exit "$result"
+          fi
+          python3 scripts/ci/verify-ios-signing.py \
+            --app "$RUNNER_TEMP/TheLastTuesday.xcarchive/Products/Applications/App.app" \
+            --bundle-id "$APP_BUNDLE_ID" --team-id "$TEAM_ID" --output "$RUNNER_TEMP/last-tuesday-signing.json"
+          xcodebuild -exportArchive -archivePath "$RUNNER_TEMP/TheLastTuesday.xcarchive" \
+            -exportOptionsPlist "$SIGNING_DIR/ExportOptions.plist" -exportPath "$RUNNER_TEMP/last-tuesday-export"
+          python3 - <<'PY'
+          import glob, os
+          files = glob.glob(os.path.join(os.environ['RUNNER_TEMP'], 'last-tuesday-export', '*.ipa'))
+          if len(files) != 1:
+              raise SystemExit('Expected exactly one exported IPA.')
+          with open(os.environ['GITHUB_OUTPUT'], 'a') as output:
+              output.write('ipa_path=' + files[0] + '\n')
+          PY
+
+      - name: Upload to TestFlight and wait for Apple processing
+        if: ${{ !inputs.setup_only }}
+        uses: Apple-Actions/upload-testflight-build@v5
+        with:
+          app-path: ${{ steps.archive.outputs.ipa_path }}
+          issuer-id: ${{ secrets.APPSTORE_ISSUER_ID }}
+          api-key-id: ${{ secrets.APPSTORE_KEY_ID }}
+          api-private-key: ${{ secrets.APPSTORE_PRIVATE_KEY }}
+          wait-for-processing: 'true'
+          release-notes: 'Play The Last Tuesday on iPhone and iPad. Please check touch controls, text readability, inventory combinations, audio, and whether your investigation resumes correctly after leaving the app.'
+
+      - name: Verify the exact uploaded build
+        if: ${{ !inputs.setup_only }}
+        env:
+          APPSTORE_ISSUER_ID: ${{ secrets.APPSTORE_ISSUER_ID }}
+          APPSTORE_KEY_ID: ${{ secrets.APPSTORE_KEY_ID }}
+          APPSTORE_PRIVATE_KEY: ${{ secrets.APPSTORE_PRIVATE_KEY }}
+          APPSTORE_APP_ID: ${{ steps.apple.outputs.app_id }}
+        run: |
+          set -euo pipefail
+          MARKETING_VERSION="$(/usr/libexec/PlistBuddy -c 'Print CFBundleShortVersionString' "$RUNNER_TEMP/TheLastTuesday.xcarchive/Products/Applications/App.app/Info.plist")"
+          export MARKETING_VERSION
+          node scripts/ci/verify-testflight.mjs --output "$RUNNER_TEMP/last-tuesday-processing.json"
+          node --input-type=module - <<'JS'
+          import {readFile,appendFile} from 'node:fs/promises';
+          const result=JSON.parse(await readFile(`${process.env.RUNNER_TEMP}/last-tuesday-processing.json`,'utf8'));
+          await appendFile(process.env.GITHUB_STEP_SUMMARY,`\nApple processed The Last Tuesday ${result.marketingVersion} (${result.buildNumber}). Build ID: ${result.buildId}.\n\nAdd this build to the app's TestFlight tester group if it is not assigned automatically. External testers may need Apple's beta review.\n`);
+          JS
+
+      - name: Keep final release verification
+        if: ${{ always() && !inputs.setup_only }}
+        uses: actions/upload-artifact@v7
+        with:
+          name: LastTuesday-processing-${{ github.run_number }}
+          path: |
+            ${{ runner.temp }}/last-tuesday-processing.json
+            ${{ runner.temp }}/last-tuesday-signing.json
+          retention-days: 7
+          if-no-files-found: ignore
+
+      - name: Remove temporary signing files
+        if: ${{ always() && (steps.apple.outcome == 'success' || steps.apple.outcome == 'failure') }}
+        run: python3 scripts/ci/clean-signing.py
+        # import-codesign-certs removes its own temporary keychain in its post step.
