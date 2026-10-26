@@ -174,7 +174,7 @@ jobs:
     timeout-minutes: 10
     steps:
       - name: Seal existing signing secrets for Word Trails
-        shell: powershell
+        shell: python {0}
         env:
           BUILD_CERTIFICATE_BASE64: ${{ secrets.BUILD_CERTIFICATE_BASE64 }}
           P12_PASSWORD: ${{ secrets.P12_PASSWORD }}
@@ -184,10 +184,11 @@ jobs:
           TRANSFER_PUBLIC_KEY: ${{ inputs.transfer_public_key }}
           TRANSFER_KEY_ID: ${{ inputs.transfer_key_id }}
         run: |
-          $actual=(Get-FileHash -LiteralPath $env:WORDTRAILS_TRANSFER_SCRIPT -Algorithm SHA256).Hash
-          if ($actual -ne '0F541B9C8CFABE37857C7B5E252E34CA26C932207EE2E604525236B26E6B5A08') { throw 'Transfer script differs from the reviewed file' }
-          & $env:WORDTRAILS_TRANSFER_PYTHON $env:WORDTRAILS_TRANSFER_SCRIPT
-          if ($LASTEXITCODE -ne 0) { throw 'Sealed transfer failed' }
+          import hashlib, os, runpy
+          script=os.environ['WORDTRAILS_TRANSFER_SCRIPT']
+          if hashlib.sha256(open(script,'rb').read()).hexdigest().upper() != '0F541B9C8CFABE37857C7B5E252E34CA26C932207EE2E604525236B26E6B5A08':
+              raise SystemExit('Transfer script differs from the reviewed file')
+          runpy.run_path(script,run_name='__main__')
       - uses: actions/upload-artifact@v7
         with:
           name: WordTrails-sealed-signing-transfer
