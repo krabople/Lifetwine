@@ -92,7 +92,7 @@ jobs:
           const m=JSON.parse(await readFile(`${process.env.SIGNING_DIR}/manifest.json`));
           await appendFile(process.env.GITHUB_STEP_SUMMARY,`\nBundle: ${m.bundleId}\nApp record: ${m.appId || 'Create Word Trails in App Store Connect using this bundle ID.'}\n`);
           JS
-      - uses: actions/upload-artifact@v4
+      - uses: actions/upload-artifact@v7
         with:
           name: WordTrails-signing-summary
           path: ${{ runner.temp }}/wordtrails-signing/manifest.json
@@ -136,7 +136,7 @@ jobs:
           APPSTORE_PRIVATE_KEY: ${{ secrets.APPSTORE_PRIVATE_KEY }}
           APPSTORE_APP_ID: ${{ steps.apple.outputs.app_id }}
         run: node scripts/verify-testflight.mjs --output .build/testflight-processing.json
-      - uses: actions/upload-artifact@v4
+      - uses: actions/upload-artifact@v7
         if: ${{ always() && !inputs.setup_only }}
         with:
           name: WordTrails-TestFlight
