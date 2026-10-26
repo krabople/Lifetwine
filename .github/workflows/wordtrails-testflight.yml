@@ -119,6 +119,18 @@ jobs:
           set -o pipefail
           xcodebuild archive -project WordTrails.xcodeproj -scheme WordTrails -configuration Release -destination 'generic/platform=iOS' -archivePath .build/WordTrails.xcarchive WORDTRAILS_CERTIFICATE_SHA1="$CERTIFICATE_SHA1" WORDTRAILS_PROFILE_UUID="$PROFILE_UUID" CURRENT_PROJECT_VERSION="$BUILD_NUMBER" | tee .build/archive.log
           xcodebuild -exportArchive -archivePath .build/WordTrails.xcarchive -exportOptionsPlist "$SIGNING_DIR/ExportOptions.plist" -exportPath .build/export
+      - name: Verify packaged version before upload
+        if: ${{ !inputs.setup_only }}
+        run: |
+          python3 - <<'PY'
+          import os,plistlib
+          path='.build/WordTrails.xcarchive/Products/Applications/WordTrails.app/Info.plist'
+          with open(path,'rb') as f: info=plistlib.load(f)
+          expected={'CFBundleIdentifier':os.environ['APP_BUNDLE_ID'],'CFBundleShortVersionString':os.environ['MARKETING_VERSION'],'CFBundleVersion':os.environ['BUILD_NUMBER']}
+          for key,value in expected.items():
+              if str(info.get(key))!=value: raise SystemExit(f'Archive metadata mismatch for {key}: expected {value}, got {info.get(key)}')
+          print('Verified packaged bundle, version and build:',expected)
+          PY
       - name: Upload to TestFlight
         if: ${{ !inputs.setup_only }}
         uses: Apple-Actions/upload-testflight-build@v5
