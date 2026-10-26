@@ -102,7 +102,7 @@ jobs:
         run: echo 'Create the Word Trails app record in App Store Connect before uploading.' >&2; exit 1
       - name: Test game engine
         if: ${{ !inputs.setup_only }}
-        run: swift test --parallel
+        run: swift test -c release --parallel
       - name: Prepare Xcode project
         if: ${{ !inputs.setup_only }}
         run: |
