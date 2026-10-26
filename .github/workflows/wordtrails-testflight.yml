@@ -117,7 +117,7 @@ jobs:
           PROFILE_UUID: ${{ steps.apple.outputs.profile_uuid }}
         run: |
           set -o pipefail
-          xcodebuild archive -project WordTrails.xcodeproj -scheme WordTrails -configuration Release -destination 'generic/platform=iOS' -archivePath .build/WordTrails.xcarchive CODE_SIGN_STYLE=Manual CODE_SIGN_IDENTITY="$CERTIFICATE_SHA1" PROVISIONING_PROFILE_SPECIFIER="$PROFILE_UUID" CURRENT_PROJECT_VERSION="$BUILD_NUMBER" | tee .build/archive.log
+          xcodebuild archive -project WordTrails.xcodeproj -scheme WordTrails -configuration Release -destination 'generic/platform=iOS' -archivePath .build/WordTrails.xcarchive WORDTRAILS_CERTIFICATE_SHA1="$CERTIFICATE_SHA1" WORDTRAILS_PROFILE_UUID="$PROFILE_UUID" CURRENT_PROJECT_VERSION="$BUILD_NUMBER" | tee .build/archive.log
           xcodebuild -exportArchive -archivePath .build/WordTrails.xcarchive -exportOptionsPlist "$SIGNING_DIR/ExportOptions.plist" -exportPath .build/export
       - name: Upload to TestFlight
         if: ${{ !inputs.setup_only }}
